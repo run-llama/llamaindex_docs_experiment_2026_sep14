@@ -1,0 +1,580 @@
+---
+title: "Structured Output (Beta)"
+description: "Deprecated structured_output mode extracts JSON from documents at parse time via a custom or pre-defined schema (invoice, resume, imFeelingLucky); use LlamaExtract instead."
+---
+
+<Warning>
+**Deprecated**
+
+This page documents the deprecated Parse v1 API. For new integrations, use Parse v2. See the [v1 to v2 migration guide](/parse/guides/migration-v1-to-v2) to update existing v1 code.
+</Warning>
+
+<br />
+<br />
+
+Structured Output is deprecated on the llamaParse API, use the LlamaExtract API instead.
+<br />
+<br />
+
+## About Structured Output
+
+Structured output allows you to extract structured data (such as JSON) from a document directly at the parsing stage, reducing cost and time needed.
+
+Structured output is currently only compatible with our default parsing mode and can be activated by setting `structured_output=True` in the API.
+
+<Tabs>
+  <Tab title="Python">
+  ```python
+  parser = LlamaParse(
+    structured_output=True
+  )
+  ```
+  </Tab>
+  <Tab title="API">
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'structured_output="true"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+  </Tab>
+</Tabs>
+
+<br />
+<br />
+
+You then need to provide either:
+
+- a JSON schema in the `structured_output_json_schema` API variable, which will be used to extract data in the desired format
+- or the name of one of our pre-defined schemas in the variable `structured_output_json_schema_name`
+
+<Tabs>
+  <Tab title="Python (Schema)">
+  ```python
+  parser = LlamaParse(
+    structured_output_json_schema='A JSON SCHEMA'
+  )
+  ```
+  </Tab>
+  <Tab title="API (Schema)">
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'structured_output_json_schema="A JSON SCHEMA"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+  </Tab>
+  <Tab title="Python (Preset)">
+  ```python
+  parser = LlamaParse(
+    structured_output_json_schema_name="invoice"
+  )
+  ```
+  </Tab>
+  <Tab title="API (Preset)">
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'structured_output_json_schema_name="invoice"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+  </Tab>
+</Tabs>
+
+<br />
+<br />
+
+## Supported Pre-defined Schemas
+
+<br />
+<br />
+
+## imFeelingLucky
+
+Wildcard schema that lets LlamaParse infer output format
+
+<Tabs>
+  <Tab title="API">
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'structured_output_json_schema_name="imFeelingLucky"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+  </Tab>
+</Tabs>
+
+<br />
+<br />
+
+## Invoice
+
+Standard invoice schema for line items, tax, and totals
+
+<Tabs>
+  <Tab title="API">
+  ```bash
+    curl -X 'POST' \
+      'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+      -H 'accept: application/json' \
+      -H 'Content-Type: multipart/form-data' \
+      -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+      --form 'structured_output_json_schema_name="invoice"' \
+      -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+  </Tab>
+  <Tab title="Invoice Schema">
+  #### Structured Output: Invoice Schema
+
+Type: `object`
+
+**_Properties_**
+
+ - <b id="#/properties/invoiceNumber">invoiceNumber</b> `required`
+	 - _Unique identifier for the invoice_
+	 - Type: `string`
+ - <b id="#/properties/invoiceDate">invoiceDate</b> `required`
+	 - _Date the invoice was issued (ISO format)_
+	 - Type: `string`
+	 - String format must be a "date"
+ - <b id="#/properties/dueDate">dueDate</b>
+	 - _Payment due date (ISO format)_
+	 - Type: `string`
+	 - String format must be a "date"
+ - <b id="#/properties/billingAddress">billingAddress</b> `required`
+	 - _Billing address details_
+	 - Type: `object`
+	 - **_Properties_**
+		 - <b id="#/properties/billingAddress/properties/name">name</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/billingAddress/properties/street">street</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/billingAddress/properties/city">city</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/billingAddress/properties/state">state</b>
+			 - Type: `string`
+		 - <b id="#/properties/billingAddress/properties/postalCode">postalCode</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/billingAddress/properties/country">country</b> `required`
+			 - Type: `string`
+ - <b id="#/properties/shippingAddress">shippingAddress</b>
+	 - _Shipping address details_
+	 - Type: `object`
+	 - **_Properties_**
+		 - <b id="#/properties/shippingAddress/properties/name">name</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/shippingAddress/properties/street">street</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/shippingAddress/properties/city">city</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/shippingAddress/properties/state">state</b>
+			 - Type: `string`
+		 - <b id="#/properties/shippingAddress/properties/postalCode">postalCode</b> `required`
+			 - Type: `string`
+		 - <b id="#/properties/shippingAddress/properties/country">country</b> `required`
+			 - Type: `string`
+ - <b id="#/properties/items">items</b> `required`
+	 - _List of items included in the invoice_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/items/items/properties/description">description</b> `required`
+				 - _Description of the item_
+				 - Type: `string`
+			 - <b id="#/properties/items/items/properties/quantity">quantity</b> `required`
+				 - _Quantity of the item_
+				 - Type: `number`
+				 - Range:  &ge; 1
+			 - <b id="#/properties/items/items/properties/unitPrice">unitPrice</b> `required`
+				 - _Price per unit of the item_
+				 - Type: `number`
+				 - Range:  &ge; 0
+			 - <b id="#/properties/items/items/properties/totalPrice">totalPrice</b> `required`
+				 - _Total price for this item_
+				 - Type: `number`
+				 - Range:  &ge; 0
+ - <b id="#/properties/subTotal">subTotal</b> `required`
+	 - _Subtotal for all items_
+	 - Type: `number`
+	 - Range:  &ge; 0
+ - <b id="#/properties/tax">tax</b> `required`
+	 - _Tax details_
+	 - Type: `object`
+	 - **_Properties_**
+		 - <b id="#/properties/tax/properties/rate">rate</b> `required`
+			 - _Tax rate as a percentage_
+			 - Type: `number`
+			 - Range:  &ge; 0
+		 - <b id="#/properties/tax/properties/amount">amount</b> `required`
+			 - _Total tax amount_
+			 - Type: `number`
+			 - Range:  &ge; 0
+ - <b id="#/properties/total">total</b> `required`
+	 - _Total amount due (subtotal + tax)_
+	 - Type: `number`
+	 - Range:  &ge; 0
+ - <b id="#/properties/notes">notes</b>
+	 - _Additional notes or instructions for the invoice_
+	 - Type: `string`
+ - <b id="#/properties/status">status</b> `required`
+	 - _Current payment status of the invoice_
+	 - Type: `string`
+	 - The value is restricted to the following: 
+		 1. _"Paid"_
+		 2. _"Unpaid"_
+		 3. _"Overdue"_
+
+  </Tab>
+</Tabs>
+
+<br />
+<br />
+
+## Resume
+
+Follows the JSON Resume standard
+
+<Tabs>
+  <Tab title="API">
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'structured_output_json_schema_name="resume"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+  </Tab>
+  <Tab title="Resume Schema">
+  #### Structured Output: Resume Schema
+
+  Based on [https://github.com/jsonresume/resume-schema](https://github.com/jsonresume/resume-schema)
+
+Type: `object`
+
+**_Properties_**
+
+ - <b id="#/properties/basics">basics</b>
+	 - Type: `object`
+	 - **_Properties_**
+		 - <b id="#/properties/basics/properties/name">name</b>
+			 - Type: `string`
+		 - <b id="#/properties/basics/properties/label">label</b>
+			 - _e.g. Web Developer_
+			 - Type: `string`
+		 - <b id="#/properties/basics/properties/image">image</b>
+			 - _URL (as per RFC 3986) to a image in JPEG or PNG format_
+			 - Type: `string`
+		 - <b id="#/properties/basics/properties/email">email</b>
+			 - _e.g. thomas@gmail.com_
+			 - Type: `string`
+			 - String format must be a "email"
+		 - <b id="#/properties/basics/properties/phone">phone</b>
+			 - _Phone numbers are stored as strings so use any format you like, e.g. 712-117-2923_
+			 - Type: `string`
+		 - <b id="#/properties/basics/properties/url">url</b>
+			 - _URL (as per RFC 3986) to your website, e.g. personal homepage_
+			 - Type: `string`
+			 - String format must be a "uri"
+		 - <b id="#/properties/basics/properties/summary">summary</b>
+			 - _Write a short 2-3 sentence biography about yourself_
+			 - Type: `string`
+		 - <b id="#/properties/basics/properties/location">location</b>
+			 - Type: `object`
+			 - **_Properties_**
+				 - <b id="#/properties/basics/properties/location/properties/address">address</b>
+					 - Type: `string`
+				 - <b id="#/properties/basics/properties/location/properties/postalCode">postalCode</b>
+					 - Type: `string`
+				 - <b id="#/properties/basics/properties/location/properties/city">city</b>
+					 - Type: `string`
+				 - <b id="#/properties/basics/properties/location/properties/countryCode">countryCode</b>
+					 - _code as per ISO-3166-1 ALPHA-2, e.g. US, AU, IN_
+					 - Type: `string`
+				 - <b id="#/properties/basics/properties/location/properties/region">region</b>
+					 - _The general region where you live. Can be a US state, or a province, for instance._
+					 - Type: `string`
+		 - <b id="#/properties/basics/properties/profiles">profiles</b>
+			 - _Specify any number of social networks that you participate in_
+			 - Type: `array`
+				 - **_Items_**
+				 - Type: `object`
+				 - This schema accepts additional properties.
+				 - **_Properties_**
+					 - <b id="#/properties/basics/properties/profiles/items/properties/network">network</b>
+						 - _e.g. Facebook or Twitter_
+						 - Type: `string`
+					 - <b id="#/properties/basics/properties/profiles/items/properties/username">username</b>
+						 - _e.g. neutralthoughts_
+						 - Type: `string`
+					 - <b id="#/properties/basics/properties/profiles/items/properties/url">url</b>
+						 - _e.g. http://twitter.example.com/neutralthoughts_
+						 - Type: `string`
+						 - String format must be a "uri"
+ - <b id="#/properties/work">work</b>
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/work/items/properties/name">name</b>
+				 - _e.g. Facebook_
+				 - Type: `string`
+			 - <b id="#/properties/work/items/properties/location">location</b>
+				 - _e.g. Menlo Park, CA_
+				 - Type: `string`
+			 - <b id="#/properties/work/items/properties/description">description</b>
+				 - _e.g. Social Media Company_
+				 - Type: `string`
+			 - <b id="#/properties/work/items/properties/position">position</b>
+				 - _e.g. Software Engineer_
+				 - Type: `string`
+			 - <b id="#/properties/work/items/properties/url">url</b>
+				 - _e.g. http://facebook.example.com_
+				 - Type: `string`
+				 - String format must be a "uri"
+			 - <b id="#/properties/work/items/properties/startDate">startDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/work/items/properties/endDate">endDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/work/items/properties/summary">summary</b>
+				 - _Give an overview of your responsibilities at the company_
+				 - Type: `string`
+			 - <b id="#/properties/work/items/properties/highlights">highlights</b>
+				 - _Specify multiple accomplishments_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. Increased profits by 20% from 2011-2012 through viral advertising_
+					 - Type: `string`
+ - <b id="#/properties/volunteer">volunteer</b>
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/volunteer/items/properties/organization">organization</b>
+				 - _e.g. Facebook_
+				 - Type: `string`
+			 - <b id="#/properties/volunteer/items/properties/position">position</b>
+				 - _e.g. Software Engineer_
+				 - Type: `string`
+			 - <b id="#/properties/volunteer/items/properties/url">url</b>
+				 - _e.g. http://facebook.example.com_
+				 - Type: `string`
+				 - String format must be a "uri"
+			 - <b id="#/properties/volunteer/items/properties/startDate">startDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/volunteer/items/properties/endDate">endDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/volunteer/items/properties/summary">summary</b>
+				 - _Give an overview of your responsibilities at the company_
+				 - Type: `string`
+			 - <b id="#/properties/volunteer/items/properties/highlights">highlights</b>
+				 - _Specify accomplishments and achievements_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. Increased profits by 20% from 2011-2012 through viral advertising_
+					 - Type: `string`
+ - <b id="#/properties/education">education</b>
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/education/items/properties/institution">institution</b>
+				 - _e.g. Massachusetts Institute of Technology_
+				 - Type: `string`
+			 - <b id="#/properties/education/items/properties/url">url</b>
+				 - _e.g. http://facebook.example.com_
+				 - Type: `string`
+				 - String format must be a "uri"
+			 - <b id="#/properties/education/items/properties/area">area</b>
+				 - _e.g. Arts_
+				 - Type: `string`
+			 - <b id="#/properties/education/items/properties/studyType">studyType</b>
+				 - _e.g. Bachelor_
+				 - Type: `string`
+			 - <b id="#/properties/education/items/properties/startDate">startDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/education/items/properties/endDate">endDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/education/items/properties/score">score</b>
+				 - _grade point average, e.g. 3.67/4.0_
+				 - Type: `string`
+			 - <b id="#/properties/education/items/properties/courses">courses</b>
+				 - _List notable courses/subjects_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. H1302 - Introduction to American history_
+					 - Type: `string`
+ - <b id="#/properties/awards">awards</b>
+	 - _Specify any awards you have received throughout your professional career_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/awards/items/properties/title">title</b>
+				 - _e.g. One of the 100 greatest minds of the century_
+				 - Type: `string`
+			 - <b id="#/properties/awards/items/properties/date">date</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/awards/items/properties/awarder">awarder</b>
+				 - _e.g. Time Magazine_
+				 - Type: `string`
+			 - <b id="#/properties/awards/items/properties/summary">summary</b>
+				 - _e.g. Received for my work with Quantum Physics_
+				 - Type: `string`
+ - <b id="#/properties/certificates">certificates</b>
+	 - _Specify any certificates you have received throughout your professional career_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - This schema accepts additional properties.
+		 - **_Properties_**
+			 - <b id="#/properties/certificates/items/properties/name">name</b>
+				 - _e.g. Certified Kubernetes Administrator_
+				 - Type: `string`
+			 - <b id="#/properties/certificates/items/properties/date">date</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/certificates/items/properties/url">url</b>
+				 - _e.g. http://example.com_
+				 - Type: `string`
+				 - String format must be a "uri"
+			 - <b id="#/properties/certificates/items/properties/issuer">issuer</b>
+				 - _e.g. CNCF_
+				 - Type: `string`
+ - <b id="#/properties/publications">publications</b>
+	 - _Specify your publications through your career_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/publications/items/properties/name">name</b>
+				 - _e.g. The World Wide Web_
+				 - Type: `string`
+			 - <b id="#/properties/publications/items/properties/publisher">publisher</b>
+				 - _e.g. IEEE, Computer Magazine_
+				 - Type: `string`
+			 - <b id="#/properties/publications/items/properties/releaseDate">releaseDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/publications/items/properties/url">url</b>
+				 - _e.g. http://www.computer.org.example.com/csdl/mags/co/1996/10/rx069-abs.html_
+				 - Type: `string`
+				 - String format must be a "uri"
+			 - <b id="#/properties/publications/items/properties/summary">summary</b>
+				 - _Short summary of publication. e.g. Discussion of the World Wide Web, HTTP, HTML._
+				 - Type: `string`
+ - <b id="#/properties/skills">skills</b>
+	 - _List out your professional skill-set_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - This schema accepts additional properties.
+		 - **_Properties_**
+			 - <b id="#/properties/skills/items/properties/name">name</b>
+				 - _e.g. Web Development_
+				 - Type: `string`
+			 - <b id="#/properties/skills/items/properties/level">level</b>
+				 - _e.g. Master_
+				 - Type: `string`
+			 - <b id="#/properties/skills/items/properties/keywords">keywords</b>
+				 - _List some keywords pertaining to this skill_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. HTML_
+					 - Type: `string`
+ - <b id="#/properties/languages">languages</b>
+	 - _List any other languages you speak_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/languages/items/properties/language">language</b>
+				 - _e.g. English, Spanish_
+				 - Type: `string`
+			 - <b id="#/properties/languages/items/properties/fluency">fluency</b>
+				 - _e.g. Fluent, Beginner_
+				 - Type: `string`
+ - <b id="#/properties/interests">interests</b>
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/interests/items/properties/name">name</b>
+				 - _e.g. Philosophy_
+				 - Type: `string`
+			 - <b id="#/properties/interests/items/properties/keywords">keywords</b>
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. Friedrich Nietzsche_
+					 - Type: `string`
+ - <b id="#/properties/references">references</b>
+	 - _List references you have received_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/references/items/properties/name">name</b>
+				 - _e.g. Timothy Cook_
+				 - Type: `string`
+			 - <b id="#/properties/references/items/properties/reference">reference</b>
+				 - _e.g. Joe blogs was a great employee, who turned up to work at least once a week. He exceeded my expectations when it came to doing nothing._
+				 - Type: `string`
+ - <b id="#/properties/projects">projects</b>
+	 - _Specify career projects_
+	 - Type: `array`
+		 - **_Items_**
+		 - Type: `object`
+		 - **_Properties_**
+			 - <b id="#/properties/projects/items/properties/name">name</b>
+				 - _e.g. The World Wide Web_
+				 - Type: `string`
+			 - <b id="#/properties/projects/items/properties/description">description</b>
+				 - _Short summary of project. e.g. Collated works of 2017._
+				 - Type: `string`
+			 - <b id="#/properties/projects/items/properties/highlights">highlights</b>
+				 - _Specify multiple features_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. Directs you close but not quite there_
+					 - Type: `string`
+			 - <b id="#/properties/projects/items/properties/keywords">keywords</b>
+				 - _Specify special elements involved_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. AngularJS_
+					 - Type: `string`
+			 - <b id="#/properties/projects/items/properties/startDate">startDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/projects/items/properties/endDate">endDate</b>
+				 - &#36;ref: [#/definitions/iso8601](#/definitions/iso8601)
+			 - <b id="#/properties/projects/items/properties/url">url</b>
+				 - _e.g. http://www.computer.org/csdl/mags/co/1996/10/rx069-abs.html_
+				 - Type: `string`
+				 - String format must be a "uri"
+			 - <b id="#/properties/projects/items/properties/roles">roles</b>
+				 - _Specify your role on this project or in company_
+				 - Type: `array`
+					 - **_Items_**
+					 - _e.g. Team Lead, Speaker, Writer_
+					 - Type: `string`
+			 - <b id="#/properties/projects/items/properties/entity">entity</b>
+				 - _Specify the relevant company/entity affiliations e.g. 'greenpeace', 'corporationXYZ'_
+				 - Type: `string`
+			 - <b id="#/properties/projects/items/properties/type">type</b>
+				 - _ e.g. 'volunteering', 'presentation', 'talk', 'application', 'conference'_
+				 - Type: `string`
+
+  </Tab>
+</Tabs>

@@ -1,0 +1,269 @@
+---
+title: "REST API Guide"
+description: "Parse REST API endpoints, request/response shapes, expand values, and presigned URL patterns."
+---
+
+**For the complete SDK and API documentation, see the [Parse API Reference →](https://developers.llamaindex.ai/reference/resources/parsing/methods/create)**
+
+This page covers REST API usage patterns: endpoint overview, request examples, response shapes, and the `expand` parameter quick-reference.
+
+## Endpoints
+
+| Method | URL | Use case |
+|--------|-----|----------|
+| [`POST /api/v2/parse`](/api-reference/parse/parse-file) | Parse a file by ID or URL (JSON body) |
+| [`POST /api/v2/parse/upload`](/api-reference/parse/upload-file-multipart) | Upload a file and parse it in one request (multipart/form-data) |
+| [`GET /api/v2/parse`](/api-reference/parse/list-parse-jobs) | List and filter parse jobs with pagination |
+| [`GET /api/v2/parse/{job_id}`](/api-reference/parse/get-parse-job) | Check job status and retrieve results |
+
+**Required header:** `Authorization: Bearer YOUR_API_KEY` on all endpoints.
+
+**Optional header (Enterprise):** `Usage-Tags` attributes a request's usage to a team, environment, or customer for billing breakdowns. See [Usage Tags](https://developers.llamaindex.ai/llamaparse/general/usage_tags).
+
+### Creating a parse job
+
+Send a JSON body with `file_id` (or `source_url`), `tier`, `version`, and any options:
+
+```bash
+curl -X POST 'https://api.cloud.llamaindex.ai/api/v2/parse' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+  --data '{
+    "file_id": "<file_id>",
+    "tier": "agentic",
+    "version": "latest"
+  }'
+```
+
+The create response returns the job fields at the **top level** — `id`, `project_id`, `status`, and `tier` (there is no `job` wrapper here). Use the top-level `id` to retrieve results with the `expand` query parameter (see [Retrieving results](#retrieving-results) below). See [Configuring Parse](/parse/guides/configuring-parse) for every available option.
+
+
+<Warning>
+**Create and retrieve responses have different shapes**
+
+[`POST /api/v2/parse`](/api-reference/parse/parse-file) returns `id` and `status` at the **top level**, but [`GET /api/v2/parse/{job_id}`](/api-reference/parse/get-parse-job) nests the same fields under a `job` object. When polling, read `job.status` — reusing the top-level `.status` path from the create response will always read empty.
+</Warning>
+
+Options like `page_ranges`, `crop_box`, and `output_options` nest inside the same JSON body — they are **not** top-level fields. A bare `"max_pages": 2` alongside `file_id`/`tier`/`version` returns `422 extra_forbidden`; nest it under `page_ranges` instead:
+
+```bash
+curl -X POST 'https://api.cloud.llamaindex.ai/api/v2/parse' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+  --data '{
+    "file_id": "<file_id>",
+    "tier": "agentic",
+    "version": "latest",
+    "page_ranges": {"max_pages": 2}
+  }'
+```
+
+See [Configuring Parse](/parse/guides/configuring-parse) for every available option.
+
+### Uploading and parsing a file
+
+If you don't already have a `file_id`, [`POST /api/v2/parse/upload`](/api-reference/parse/upload-file-multipart) uploads a file and starts a parse job in a single multipart/form-data request. Send the file as a `file` field and the parse configuration as a `configuration` JSON string field:
+
+```bash
+curl -X POST 'https://api.cloud.llamaindex.ai/api/v2/parse/upload' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+  -F 'file=@/path/to/your/file.pdf' \
+  -F 'configuration={"tier": "agentic", "version": "latest"}'
+```
+
+Like the JSON create endpoint above, the response returns `id` and `status` at the top level. See [Configuring Parse](/parse/guides/configuring-parse) for every field you can set inside `configuration`.
+
+---
+
+## Listing jobs
+
+```bash
+curl 'https://api.cloud.llamaindex.ai/api/v2/parse?page_size=10&status=COMPLETED' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page_size` | integer | Max items per page (optional) |
+| `page_token` | string | Token for the next page (from a previous response) |
+| `status` | string | Filter: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED` |
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "id": "job-uuid-1",
+      "project_id": "project-uuid",
+      "status": "COMPLETED",
+      "error_message": null
+    }
+  ],
+  "next_page_token": "eyJsYXN0X2lkIjogImpvYi...",
+  "total_size": 42
+}
+```
+
+---
+
+## Retrieving results
+
+```bash
+curl 'https://api.cloud.llamaindex.ai/api/v2/parse/{job_id}?expand=markdown,items,metadata' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY"
+```
+
+The response always includes a `job` object with `id`, `project_id`, `status`, and `error_message`. Additional fields depend on the `expand` parameter.
+
+### Expand values
+
+| Value | What it returns |
+|-------|-----------------|
+| `text` | Plain text per page |
+| `markdown` | Markdown per page |
+| `items` | Structured JSON items (tables, headings, paragraphs per page) |
+| `metadata` | Page-level metadata (confidence, speaker notes, cost_optimized, etc.) |
+| `job_metadata` | Job-level processing details (timing, configuration echo) |
+| `usage` | Credits billed against the job, under `job.usage` |
+| `text_full` | Full plain text as a single string (all pages concatenated) |
+| `markdown_full` | Full markdown as a single string (all pages concatenated) |
+| `text_content_metadata` | Text file presigned download URL |
+| `markdown_content_metadata` | Markdown file presigned download URL |
+| `items_content_metadata` | Items file presigned download URL |
+| `metadata_content_metadata` | Metadata file presigned download URL |
+| `text_full_content_metadata` | Full text file presigned download URL |
+| `markdown_full_content_metadata` | Full markdown file presigned download URL |
+| `xlsx_content_metadata` | XLSX file presigned download URL |
+| `output_pdf_content_metadata` | Output PDF presigned download URL |
+| `images_content_metadata` | Images metadata with per-image presigned URLs |
+
+Combine multiple values: `?expand=markdown,items,images_content_metadata`
+
+For detailed guidance on choosing expand values, see [Retrieving Results](/parse/guides/retrieving-results).
+
+### Usage response shape
+
+`expand=usage` returns the billed credits inside the `job` object. `credits` reads `null` until billing records the job, which can trail completion ([details](/parse/guides/retrieving-results#credits-billed-for-a-job)).
+
+```json
+{
+  "job": {
+    "id": "pjb-123",
+    "status": "COMPLETED",
+    "usage": {
+      "credits": 30.0
+    }
+  }
+}
+```
+
+### Content metadata response shapes
+
+When requesting `*_content_metadata` expand values, the response includes presigned URLs for direct download:
+
+**XLSX and PDF:**
+
+```json
+{
+  "result_content_metadata": {
+    "xlsx": {
+      "size_bytes": 15234,
+      "exists": true,
+      "presigned_url": "https://s3.amazonaws.com/..."
+    },
+    "outputPDF": {
+      "size_bytes": 102400,
+      "exists": true,
+      "presigned_url": "https://s3.amazonaws.com/..."
+    }
+  }
+}
+```
+
+**Images:**
+
+```json
+{
+  "images_content_metadata": {
+    "total_count": 3,
+    "images": [
+      {
+        "index": 0,
+        "filename": "image_0.png",
+        "content_type": "image/png",
+        "size_bytes": 12345,
+        "presigned_url": "https://s3.amazonaws.com/..."
+      }
+    ]
+  }
+}
+```
+
+You can filter images with the `image_filenames` query parameter:
+
+```bash
+curl 'https://api.cloud.llamaindex.ai/api/v2/parse/{job_id}?expand=images_content_metadata&image_filenames=image_0.png,image_1.jpg' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY"
+```
+
+> **Presigned URLs are temporary.** Download files promptly after retrieving them, or call the endpoint again for fresh URLs.
+
+---
+
+## Error responses
+
+v2 returns structured validation errors:
+
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["tier"],
+      "msg": "Unsupported tier: invalid_tier. Must be one of: fast, cost_effective, agentic, agentic_plus",
+      "input": {}
+    }
+  ]
+}
+```
+
+---
+
+## See also
+
+- [Configuring Parse](/parse/guides/configuring-parse) — every option explained with examples
+- [Retrieving Results](/parse/guides/retrieving-results) — detailed `expand` guidance and common patterns
+- [Migration Guide: v1 to v2](/parse/guides/migration-v1-to-v2) — parameter mapping for v1 users
+- [Tiers](/parse/guides/tiers) — tier comparison and version pinning
+- [Parse API Reference](https://developers.llamaindex.ai/reference/resources/parsing/methods/create) — complete SDK and API documentation
+
+## Related API endpoints
+
+Generated from the OpenAPI spec — each page has an interactive "Try it" panel.
+
+<Columns cols={2}>
+  <Card title="POST /api/v2/parse/upload" href="/api-reference/parse/upload-file-multipart" icon="code">
+    Upload File Multipart
+  </Card>
+  <Card title="POST /api/v2/parse" href="/api-reference/parse/parse-file" icon="code">
+    Parse File
+  </Card>
+  <Card title="GET /api/v2/parse/{job_id}" href="/api-reference/parse/get-parse-job" icon="code">
+    Get Parse Job
+  </Card>
+  <Card title="GET /api/v2/parse" href="/api-reference/parse/list-parse-jobs" icon="code">
+    List Parse Jobs
+  </Card>
+  <Card title="GET /api/v2/parse/versions" href="/api-reference/parse/list-parse-versions" icon="code">
+    List Parse Versions
+  </Card>
+  <Card title="POST /api/v2/parse/{job_id}/cancel" href="/api-reference/parse/cancel-parse-job" icon="code">
+    Cancel Parse Job
+  </Card>
+  <Card title="DELETE /api/v2/parse/{job_id}" href="/api-reference/parse/delete-parse-job" icon="code">
+    Delete Parse Job
+  </Card>
+</Columns>

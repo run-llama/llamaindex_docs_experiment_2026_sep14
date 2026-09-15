@@ -1,0 +1,378 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "LlamaParse Docs",
+  "description": "PoC evaluating Mintlify as the docs platform for LlamaIndex / LlamaCloud.",
+  "colors": {
+    "primary": "#3E18F9",
+    "light": "#92AEFF",
+    "dark": "#3E18F9"
+  },
+  "fonts": {
+    "heading": {
+      "family": "Overused Grotesk",
+      "source": "https://www.llamaindex.ai/fonts/OverusedGrotesk-VF.woff2",
+      "format": "woff2"
+    },
+    "body": {
+      "family": "Overused Grotesk",
+      "source": "https://www.llamaindex.ai/fonts/OverusedGrotesk-VF.woff2",
+      "format": "woff2"
+    }
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "navigation": {
+    "versions": [
+      {
+        "version": "v2 (current)",
+        "default": true,
+        "tabs": [
+          {
+            "tab": "Documentation",
+            "groups": [
+              {
+                "group": "Get started",
+                "pages": [
+                  "index",
+                  "quickstart"
+                ]
+              },
+              {
+                "group": "Parse",
+                "pages": [
+                  "parse/overview",
+                  "parse/getting_started"
+                ]
+              },
+              {
+                "group": "Solve a problem",
+                "pages": [
+                  "parse/examples/overview",
+                  "parse/examples/parse_pdf_outputs",
+                  "parse/examples/parse_financial_tables",
+                  "parse/examples/enriched_forms",
+                  "parse/examples/parse_excel_sheets",
+                  "parse/examples/parse_charts_pandas",
+                  "parse/examples/parse_granular_bboxes",
+                  "parse/examples/parse_with_prompts",
+                  "parse/examples/async_parse_folder",
+                  "parse/examples/parse_pdf_typescript"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "parse/guides/tiers",
+                  "parse/guides/configuring-parse",
+                  "parse/guides/retrieving-results",
+                  "parse/guides/api-reference",
+                  "parse/guides/recipes"
+                ]
+              },
+              {
+                "group": "Migrate",
+                "pages": [
+                  "parse/guides/migration-v1-to-v2"
+                ]
+              },
+              {
+                "group": "PoC evaluation",
+                "pages": [
+                  "evaluation/agent-features",
+                  "evaluation/component-showcase",
+                  "evaluation/checklist",
+                  "evaluation/mintlify-pros-cons"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Overview",
+                "pages": [
+                  "api-reference/overview"
+                ]
+              },
+              {
+                "group": "Parse API",
+                "openapi": "api-reference/openapi.json"
+              }
+            ]
+          },
+          {
+            "tab": "Changelog",
+            "icon": "clock-rotate-left",
+            "pages": [
+              "changelog"
+            ]
+          }
+        ]
+      },
+      {
+        "version": "v1 (legacy)",
+        "tabs": [
+          {
+            "tab": "Documentation",
+            "groups": [
+              {
+                "group": "Parse v1 (legacy)",
+                "pages": [
+                  "parse/v1/presets_and_modes/presets"
+                ]
+              },
+              {
+                "group": "Presets & modes",
+                "pages": [
+                  "parse/v1/presets_and_modes/advance_parsing_modes",
+                  "parse/v1/presets_and_modes/auto_mode",
+                  "parse/v1/presets_and_modes/output_modes"
+                ]
+              },
+              {
+                "group": "Features",
+                "pages": [
+                  "parse/v1/features/parsing_options",
+                  "parse/v1/features/multimodal",
+                  "parse/v1/features/python_usage",
+                  "parse/v1/features/layout_extraction",
+                  "parse/v1/features/metadata",
+                  "parse/v1/features/cache_options",
+                  "parse/v1/features/structured_output",
+                  "parse/v1/features/webhook",
+                  "parse/v1/features/job_parameters",
+                  "parse/v1/features/parse_region",
+                  "parse/v1/features/prompts",
+                  "parse/v1/features/parsing_instructions",
+                  "parse/v1/features/automodeTriggers"
+                ]
+              },
+              {
+                "group": "Examples",
+                "pages": [
+                  "parse/v1/examples/overview",
+                  "parse/v1/examples/async_parse_folder",
+                  "parse/v1/examples/parse_excel_sheets",
+                  "parse/v1/examples/parse_with_prompts"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Current docs",
+        "href": "https://docs.cloud.llamaindex.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://cloud.llamaindex.ai"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/run-llama",
+      "x": "https://x.com/llama_index"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/llamaparse",
+      "destination": "/quickstart"
+    },
+    {
+      "source": "/llamaparse/parse",
+      "destination": "/parse/overview"
+    },
+    {
+      "source": "/llamaparse/parse/examples",
+      "destination": "/parse/examples/overview"
+    },
+    {
+      "source": "/llamaparse/parse/v1/examples",
+      "destination": "/parse/v1/examples/overview"
+    },
+    {
+      "source": "/llamaparse/parse/examples/async_parse_folder",
+      "destination": "/parse/examples/async_parse_folder"
+    },
+    {
+      "source": "/llamaparse/parse/examples/enriched_forms",
+      "destination": "/parse/examples/enriched_forms"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_charts_pandas",
+      "destination": "/parse/examples/parse_charts_pandas"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_excel_sheets",
+      "destination": "/parse/examples/parse_excel_sheets"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_financial_tables",
+      "destination": "/parse/examples/parse_financial_tables"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_granular_bboxes",
+      "destination": "/parse/examples/parse_granular_bboxes"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_pdf_outputs",
+      "destination": "/parse/examples/parse_pdf_outputs"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_pdf_typescript",
+      "destination": "/parse/examples/parse_pdf_typescript"
+    },
+    {
+      "source": "/llamaparse/parse/examples/parse_with_prompts",
+      "destination": "/parse/examples/parse_with_prompts"
+    },
+    {
+      "source": "/llamaparse/parse/getting_started",
+      "destination": "/parse/getting_started"
+    },
+    {
+      "source": "/llamaparse/parse/guides/api-reference",
+      "destination": "/parse/guides/api-reference"
+    },
+    {
+      "source": "/llamaparse/parse/guides/configuring-parse",
+      "destination": "/parse/guides/configuring-parse"
+    },
+    {
+      "source": "/llamaparse/parse/guides/migration-v1-to-v2",
+      "destination": "/parse/guides/migration-v1-to-v2"
+    },
+    {
+      "source": "/llamaparse/parse/guides/recipes",
+      "destination": "/parse/guides/recipes"
+    },
+    {
+      "source": "/llamaparse/parse/guides/retrieving-results",
+      "destination": "/parse/guides/retrieving-results"
+    },
+    {
+      "source": "/llamaparse/parse/guides/tiers",
+      "destination": "/parse/guides/tiers"
+    },
+    {
+      "source": "/llamaparse/parse/v1/examples/async_parse_folder",
+      "destination": "/parse/v1/examples/async_parse_folder"
+    },
+    {
+      "source": "/llamaparse/parse/v1/examples/parse_excel_sheets",
+      "destination": "/parse/v1/examples/parse_excel_sheets"
+    },
+    {
+      "source": "/llamaparse/parse/v1/examples/parse_with_prompts",
+      "destination": "/parse/v1/examples/parse_with_prompts"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/automodeTriggers",
+      "destination": "/parse/v1/features/automodeTriggers"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/cache_options",
+      "destination": "/parse/v1/features/cache_options"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/job_parameters",
+      "destination": "/parse/v1/features/job_parameters"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/layout_extraction",
+      "destination": "/parse/v1/features/layout_extraction"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/metadata",
+      "destination": "/parse/v1/features/metadata"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/multimodal",
+      "destination": "/parse/v1/features/multimodal"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/parse_region",
+      "destination": "/parse/v1/features/parse_region"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/parsing_instructions",
+      "destination": "/parse/v1/features/parsing_instructions"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/parsing_options",
+      "destination": "/parse/v1/features/parsing_options"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/prompts",
+      "destination": "/parse/v1/features/prompts"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/python_usage",
+      "destination": "/parse/v1/features/python_usage"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/structured_output",
+      "destination": "/parse/v1/features/structured_output"
+    },
+    {
+      "source": "/llamaparse/parse/v1/features/webhook",
+      "destination": "/parse/v1/features/webhook"
+    },
+    {
+      "source": "/llamaparse/parse/v1/presets_and_modes/advance_parsing_modes",
+      "destination": "/parse/v1/presets_and_modes/advance_parsing_modes"
+    },
+    {
+      "source": "/llamaparse/parse/v1/presets_and_modes/auto_mode",
+      "destination": "/parse/v1/presets_and_modes/auto_mode"
+    },
+    {
+      "source": "/llamaparse/parse/v1/presets_and_modes/output_modes",
+      "destination": "/parse/v1/presets_and_modes/output_modes"
+    },
+    {
+      "source": "/llamaparse/parse/v1/presets_and_modes/presets",
+      "destination": "/parse/v1/presets_and_modes/presets"
+    }
+  ],
+  "contextual": {
+    "options": [
+      "copy",
+      "assistant",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode",
+      "add-mcp"
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://www.llamaindex.ai"
+  },
+  "favicon": "/favicon.ico",
+  "background": {
+    "color": {
+      "light": "#F5F5F5",
+      "dark": "#000000"
+    }
+  },
+  "seo": {
+    "indexing": "navigable"
+  }
+}

@@ -1,0 +1,475 @@
+---
+title: "Granular Bounding Boxes: Word, Line, and Cell Grounding"
+description: "Request per-word, per-line, and per-cell bounding boxes from LlamaParse and walk the JSONL sidecar to ground text and table cells for citation highlighting."
+---
+
+import ApiKeyShell from "/snippets/api-key-shell.mdx";
+import ClientInitGo from "/snippets/client-init-go.mdx";
+import ClientInitJava from "/snippets/client-init-java.mdx";
+import ClientInitPython from "/snippets/client-init-python.mdx";
+import ClientInitTypescript from "/snippets/client-init-typescript.mdx";
+import InstallCli from "/snippets/install-cli.mdx";
+import InstallGo from "/snippets/install-go.mdx";
+import InstallJava from "/snippets/install-java.mdx";
+import InstallTypescript from "/snippets/install-typescript.mdx";
+
+This example shows how to get **per-word**, **per-line**, and **per-table-cell** bounding boxes alongside the regular item-level layout boxes Parse returns, and how to fetch + walk the JSONL sidecar that carries them.
+
+Use this when you need to:
+
+- Highlight individual words or lines on a PDF viewer for citation back-references.
+- Ground extracted answers down to the exact glyph rather than the whole paragraph.
+- Build a side-by-side preview that hover-syncs from markdown text → highlighted region on the source document.
+
+Granular bounding boxes are not delivered inline on the parse-result response — they live in a separate **JSONL sidecar** that the result links to via a presigned URL. This is a deliberate split: the sidecar can be many MB on a long document, and most callers don't need it. The flow is two steps: parse with `granular_bboxes` set, then download the sidecar URL.
+
+## 1. Setup
+
+Set your API key so the SDKs pick it up automatically:
+
+<ApiKeyShell />
+
+<Tabs>
+<Tab title="Python">
+
+Install the SDK — plus `httpx`, which the sidecar download below uses:
+
+```bash
+pip install "llama-cloud>=2.8" httpx
+```
+
+<ClientInitPython />
+
+</Tab>
+<Tab title="TypeScript">
+
+Install the SDK:
+
+<InstallTypescript />
+
+<ClientInitTypescript />
+
+</Tab>
+<Tab title="Go">
+
+Install the SDK:
+
+<InstallGo />
+
+<ClientInitGo />
+
+</Tab>
+<Tab title="Java">
+
+Add the SDK to your build:
+
+<InstallJava />
+
+<ClientInitJava />
+
+</Tab>
+<Tab title="CLI">
+
+Install the CLI:
+
+<InstallCli />
+
+`llp` reads `LLAMA_CLOUD_API_KEY` from the environment (or pass `--api-key`).
+
+</Tab>
+</Tabs>
+
+## 2. Parse with `granular_bboxes`
+
+Set `output_options.granular_bboxes` to any subset of `"word"`, `"line"`, `"cell"`. You can request just one level or all three. Parse will produce the JSONL sidecar automatically — there is **no** corresponding `expand` value to add.
+
+In Python and TypeScript the SDK blocks until the job finishes; in Go, Java, and the CLI you create the job, poll until it reaches a terminal status, then fetch the result. `items` is optional here — request it to compare the inline items tree against the sidecar; the sidecar URL itself is auto-included on the result either way.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+# 1) Upload the file
+file = client.files.create(
+    file="executive-summary-2024.pdf",
+    purpose="parse",
+)
+
+# 2) Parse with word + line + cell grounding
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    output_options={
+        "granular_bboxes": ["word", "line", "cell"],
+    },
+    expand=["items"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+import fs from 'fs';
+
+// 1) Upload the file
+const file = await client.files.create({
+  file: fs.createReadStream('executive-summary-2024.pdf'),
+  purpose: 'parse',
+});
+
+// 2) Parse with word + line + cell grounding
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  output_options: {
+    granular_bboxes: ['word', 'line', 'cell'],
+  },
+  expand: ['items'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+// 1) Upload the file
+f, err := os.Open("executive-summary-2024.pdf")
+if err != nil {
+	log.Fatal(err)
+}
+defer f.Close()
+
+file, err := client.Files.New(ctx, llamacloud.FileNewParams{
+	File:    f,
+	Purpose: "parse",
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+// 2) Parse with word + line + cell grounding
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	OutputOptions: llamacloud.ParsingNewParamsOutputOptions{
+		GranularBboxes: []string{"word", "line", "cell"},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+// expand is a GET parameter — poll until terminal, then fetch the result
+getParams := llamacloud.ParsingGetParams{Expand: []string{"items"}}
+result, err := client.Parsing.Get(ctx, job.ID, getParams)
+if err != nil {
+	log.Fatal(err)
+}
+for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+	time.Sleep(2 * time.Second)
+	result, err = client.Parsing.Get(ctx, job.ID, getParams)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+if result.Job.Status != "COMPLETED" {
+	log.Fatalf("parse ended as %s", result.Job.Status)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+// 1) Upload the file
+FileCreateResponse file = client.files().create(FileCreateParams.builder()
+        .file(Paths.get("executive-summary-2024.pdf"))
+        .purpose("parse")
+        .build());
+
+// 2) Parse with word + line + cell grounding
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .outputOptions(ParsingCreateParams.OutputOptions.builder()
+                .addGranularBbox(ParsingCreateParams.OutputOptions.GranularBbox.WORD)
+                .addGranularBbox(ParsingCreateParams.OutputOptions.GranularBbox.LINE)
+                .addGranularBbox(ParsingCreateParams.OutputOptions.GranularBbox.CELL)
+                .build())
+        .build());
+
+// expand is a query parameter — poll until terminal, then fetch the result
+ParsingGetParams getParams = ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("items")
+        .build();
+
+ParsingGetResponse result = client.parsing().get(getParams);
+while (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+    Thread.sleep(2000);
+    result = client.parsing().get(getParams);
+}
+if (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+    throw new RuntimeException("parse ended as " + result.job().status());
+}
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+# Upload the document
+FILE_ID=$(llp files create \
+  --file executive-summary-2024.pdf \
+  --purpose parse | jq -r '.id')
+
+# Start a parse job with word + line + cell grounding
+JOB_ID=$(llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --output-options.granular-bboxes '[word, line, cell]' | jq -r '.id')
+
+# Poll until the job reaches a terminal status
+while true; do
+  STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+
+# The grounded-items sidecar download URL is auto-included on the result
+llp parsing get --job-id "$JOB_ID" \
+  | jq -r '.result_content_metadata.grounded_items.presigned_url'
+```
+
+</Tab>
+</Tabs>
+
+
+<Warning>
+**Not available on `fast`**
+
+The `fast` tier has no item-level layout, so granular grounding has nothing to attach to. Use `cost_effective`, `agentic`, or `agentic_plus`.
+</Warning>
+
+
+## 3. Find the sidecar URL
+
+The remaining steps — reading the sidecar URL off the result, downloading the JSONL, and walking the per-word / line / cell grounding — are shown in Python. The `result_content_metadata.grounded_items` field and the JSONL sidecar shape are identical across every SDK; only the field-access and JSON-parsing syntax differ.
+
+When `granular_bboxes` is set, the result auto-includes a `grounded_items` entry under `result_content_metadata`. Each entry carries `size_bytes`, an `exists` flag, and a `presigned_url`.
+
+```python
+sidecar = (result.result_content_metadata or {}).get("grounded_items")
+if sidecar is None:
+    raise RuntimeError("Sidecar missing — was `granular_bboxes` set on the parse request?")
+
+print(f"Sidecar: {sidecar.size_bytes} bytes")
+print(f"URL:     {sidecar.presigned_url}")
+```
+
+> **Presigned URLs are temporary.** Download promptly, or call `client.parsing.get(job_id=...)` again to mint a fresh URL.
+
+## 4. Download and parse the JSONL
+
+The sidecar is **JSONL** — one JSON object per line, one line per page — not a single JSON array. Stream it line by line.
+
+```python
+import json
+import httpx
+
+response = httpx.get(sidecar.presigned_url)
+response.raise_for_status()
+
+# Each non-empty line is one page row.
+pages = [json.loads(line) for line in response.text.splitlines() if line.strip()]
+print(f"Pages in sidecar: {len(pages)}")
+```
+
+Each page row is one of two shapes:
+
+```python
+# Success
+{
+    "page_number": 1,
+    "page_width": 612,
+    "page_height": 792,
+    "success": True,
+    "items": [...],
+}
+
+# Failure — grounding could not be produced for this page
+{
+    "page_number": 2,
+    "success": False,
+    "error": "...",
+}
+```
+
+Always check `success` before drilling in:
+
+```python
+for page in pages:
+    if not page["success"]:
+        print(f"Page {page['page_number']} failed: {page['error']}")
+        continue
+    print(f"Page {page['page_number']}: {len(page['items'])} items")
+```
+
+## 5. Walk word-level grounding
+
+Each item has the same `type` / `md` / `bbox` shape as the regular `items` response, **plus** an optional `grounding` block. For text-shaped items (paragraphs, headings, captions), `grounding` is a `GroundedTextSupport`:
+
+```python
+{
+    "source": "md",           # or "caption" — which surface the spans index into
+    "lines": [
+        {
+            "span": [0, 11],  # [start, end) character range into item["md"]
+            "bbox": { "x": 72.0, "y": 100.0, "w": 200.0, "h": 12.0 },
+            "words": [
+                {
+                    "span": [0, 5],
+                    "bbox": { "x": 72.0, "y": 100.0, "w": 35.0, "h": 12.0 },
+                },
+                # ...
+            ],
+        },
+        # ...
+    ],
+}
+```
+
+To highlight each word on page 1:
+
+```python
+page = next(p for p in pages if p["success"] and p["page_number"] == 1)
+
+for item in page["items"]:
+    grounding = item.get("grounding")
+    if not grounding or grounding.get("source") not in ("md", "caption"):
+        continue
+
+    for line in grounding["lines"]:
+        for word in line.get("words", []) or []:
+            start, end = word["span"]
+            text = item["md"][start:end]
+            box = word["bbox"]
+            print(f"  word {text!r} at ({box['x']:.0f}, {box['y']:.0f}) "
+                  f"{box['w']:.0f}×{box['h']:.0f}")
+```
+
+The `span` is a `[start, end)` character range into `item["md"]`, so `item["md"][start:end]` slices out exactly the word's source text.
+
+## 6. Walk table-cell grounding
+
+For table items, `grounding` is a `GroundedTableSupport` instead — it carries per-cell boxes and spans, plus row- and column-level boxes:
+
+```python
+{
+    "rows": [
+        # rows[row][col] is a cell or null
+        [
+            {
+                "span": [42, 56],            # optional, into the table cell text
+                "lines": [...],              # optional per-line grounding inside the cell
+                "bbox": [                    # one or more boxes covering the cell
+                    { "x": 100.0, "y": 200.0, "w": 50.0, "h": 16.0 },
+                ],
+            },
+            None,                            # missing/empty cell
+            # ...
+        ],
+        # ...
+    ],
+    "row_bboxes":    [[{...}], ...],         # boxes per row (a row may span multiple)
+    "column_bboxes": [[{...}], ...],         # boxes per column
+}
+```
+
+To find the bbox of the cell at row 0, column 1 on page 1:
+
+```python
+for item in page["items"]:
+    if item["type"] != "table":
+        continue
+    grounding = item.get("grounding")
+    if not grounding or not grounding.get("rows"):
+        continue
+
+    cell = grounding["rows"][0][1]
+    if cell is None:
+        print("cell (0, 1) is empty")
+        continue
+
+    for box in cell.get("bbox") or []:
+        print(f"cell (0, 1) box: ({box['x']:.0f}, {box['y']:.0f}) "
+              f"{box['w']:.0f}×{box['h']:.0f}")
+```
+
+## 7. Render boxes on the page screenshot
+
+The sidecar's `page_width` and `page_height` describe the original page viewport, before orientation correction. PDF `/Rotate` is already included in that viewport. Each bbox's `x/y/w/h` describes a literal unrotated rectangle; `r` rotates it clockwise around its center. **Never add `original_orientation_angle` to `r`.**
+
+Request `images_to_save: ["screenshot"]`, then retrieve results with `expand=["images_content_metadata", "metadata"]`. For ordinary PDF screenshots, the existing `metadata.pages[].original_orientation_angle` describes the page correction. Match metadata to the sidecar's `page_number`, not an array index or the displayed position within a selected page range. A missing or null angle means unknown, not zero.
+
+The helper below rotates the upright PDF screenshot clockwise by that page angle, restoring the original bbox viewport before drawing. To keep the screenshot upright instead, transform the completed bbox polygons by the inverse page rotation, as Playground does. Neither approach adds page orientation to a bbox's `r`.
+
+After aligning the screenshot, rotate each bbox's corners in page units, then scale those corners into image pixels. Scaling before rotation distorts boxes when the horizontal and vertical scales differ. This complete helper uses [Pillow](https://pillow.readthedocs.io/), installed with `pip install Pillow`:
+
+This screenshot recipe covers PDF pages, not camera-photo perspective correction.
+
+{/* rotation-render-helper:start */}
+```python
+import math
+from PIL import ImageDraw
+
+
+def bbox_polygon(box, scale_x, scale_y):
+    angle = math.radians(box.get("r") or 0)
+    cx, cy = box["x"] + box["w"] / 2, box["y"] + box["h"] / 2
+    points = []
+    for sx, sy in [(-1, -1), (1, -1), (1, 1), (-1, 1)]:
+        dx, dy = sx * box["w"] / 2, sy * box["h"] / 2
+        x = cx + dx * math.cos(angle) - dy * math.sin(angle)
+        y = cy + dx * math.sin(angle) + dy * math.cos(angle)
+        points.append((x * scale_x, y * scale_y))
+    return points
+
+
+def page_orientation(metadata, page_number):
+    matches = [page for page in metadata["pages"] if page["page_number"] == page_number]
+    if len(matches) != 1:
+        raise ValueError("Exactly one metadata record is required for the source page")
+    return matches[0].get("original_orientation_angle")
+
+
+def render_grounding(screenshot, page_orientation_angle, page_width, page_height, boxes):
+    if type(page_orientation_angle) is not int or page_orientation_angle % 90 != 0:
+        raise ValueError("A known cardinal page orientation is required")
+    if not all(math.isfinite(size) and size > 0 for size in (page_width, page_height)):
+        raise ValueError("Page dimensions must be positive and finite")
+    # Pillow uses counterclockwise angles; expand retains the entire image.
+    aligned = screenshot.rotate(-page_orientation_angle, expand=True).convert("RGB")
+    scale_x, scale_y = aligned.width / page_width, aligned.height / page_height
+    draw = ImageDraw.Draw(aligned)
+    for box in boxes:
+        draw.polygon(bbox_polygon(box, scale_x, scale_y), outline="red", width=2)
+    return aligned
+```
+{/* rotation-render-helper:end */}
+
+The SDK returns `result.metadata` as a model, not a dictionary; `result.metadata.to_dict()` has the same shape as the raw JSON. Use `page_orientation(result.metadata.to_dict(), grounded_page["page_number"])` to read the page angle. Pass the downloaded image, that angle, the sidecar page dimensions, and the word, line, or cell bboxes to `render_grounding`. Save the returned image with `.save("grounding.png")`. When page orientation is unknown, establish the screenshot's frame before drawing overlays.
+
+## See also
+
+- [Configuring Parse → Granular bounding boxes](/parse/guides/configuring-parse#granular-bounding-boxes) — request-side configuration
+- [Retrieving Results → Grounded items content metadata](/parse/guides/retrieving-results#grounded-items-content-metadata) — response-side schema reference
+- [Parse a PDF & Interpret Outputs](/parse/examples/parse_pdf_outputs) — the regular `items` tree (item-level boxes only)

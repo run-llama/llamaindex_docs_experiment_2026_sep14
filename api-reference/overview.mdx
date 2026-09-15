@@ -1,0 +1,22 @@
+---
+title: "Parse API reference"
+description: "REST endpoints for Parse v2, the legacy v1 Parsing API, and Files — generated from the public LlamaCloud OpenAPI spec."
+---
+
+These pages are generated from the public OpenAPI spec at `https://api.cloud.llamaindex.ai/api/openapi.json`, filtered to the Parse‑related operations. Every endpoint page has an interactive **Try it** panel; set your `LLAMA_CLOUD_API_KEY` as the bearer token.
+
+<Columns cols={3}>
+  <Card title="Parse (v2)" href="/api-reference/parse/parse-file" icon="bolt">
+    The current API: upload, create and poll parse jobs, list versions, cancel and delete.
+  </Card>
+  <Card title="Files" href="/api-reference/files/upload-file" icon="file">
+    Upload and manage the files that parse jobs read from.
+  </Card>
+  <Card title="Parsing (v1, legacy)" href="/api-reference/parsing/upload-file" icon="clock-rotate-left">
+    The previous API. New integrations should use v2 — see the [migration guide](/parse/guides/migration-v1-to-v2).
+  </Card>
+</Columns>
+
+<Tip>
+Prefer an SDK? The [Getting started](/parse/getting_started) guide covers Python, TypeScript, Go, Java and the CLI, and the [REST API guide](/parse/guides/api-reference) walks through the raw endpoints with curl.
+</Tip>

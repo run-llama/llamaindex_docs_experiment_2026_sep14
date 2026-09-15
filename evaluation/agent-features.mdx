@@ -1,0 +1,55 @@
+---
+title: "Agent-native features"
+description: "What Mintlify wants us to try, which of it we would actually use, and how to demo it — with the parts that only work on a hosted deployment called out."
+---
+
+Mintlify's pitch is "the knowledge infrastructure agents build on". This page separates that pitch into concrete features, says which plan each needs, which we would realistically use, and what has been prepared in this repository so the hosted demo is a matter of deploying.
+
+<Warning>
+**None of these features run in the local preview.** `mint dev` serves neither `/llms.txt`, page `.md` URLs, `/mcp`, the assistant, feedback nor analytics — all return 404 locally. The July trial deployment (`llamaindex-0863d802.mintlify.io`) has since been removed, so the demo needs a fresh hosted deployment of this repo.
+</Warning>
+
+## Baseline: how the current site scores today
+
+Mintlify's public [Agent Score](https://www.mintlify.com/score/developers.llamaindex.ai) grades **developers.llamaindex.ai at 79/100 (C)** — 16 of 30 checks passed, 6 failed, 3 warnings. The failing categories are *Markdown availability*, *Full content discoverability* (`llms-full.txt`), *Agent skills* (`skill.md`), *URL stability and redirects*, *Content discoverability* and *Observability*. Four of those six are things a Mintlify deployment provides without any work; this makes a clean before/after for the demo.
+
+## The features, ranked by how much we'd use them
+
+| Feature | What it does | Plan | Where it's configured | We'd use it? |
+| --- | --- | --- | --- | --- |
+| **Markdown for agents** — `.md` per page, `/llms.txt`, `/llms-full.txt`, `.well-known/` | Every page fetchable as clean Markdown; index ordered by our navigation; `Link`/`X-Llms-Txt` headers advertise it | Starter (free) | Automatic; optional custom `llms.txt` at repo root | **Yes — table stakes.** Directly fixes two failing Agent Score checks |
+| **MCP server** at `/mcp` | Auto-generated per site: `search`, a docs *filesystem* tool, `submit_feedback`; exposes our `skill.md` files as MCP resources; 10k req/h | Starter (free) | Automatic; `contextual.options` adds "Copy MCP URL" / "Add MCP" buttons | **Yes.** One URL to paste into Claude, Cursor or VS Code |
+| **Contextual menu** — Copy page, Open in ChatGPT / Claude / Perplexity / Cursor / VS Code, Ask AI | Per-page actions that hand the page to the reader's agent of choice | Starter | `docs.json` → `contextual.options` (done) | **Yes.** Zero cost, visibly "agent-native" |
+| **Assistant ("Ask AI")** | Chat over the docs and OpenAPI spec with citations and copyable code; starter questions; deflection to support email; can be embedded in our own app via API | **Pro** — 25 credits per answered question (free when it can't answer) | Dashboard toggle; `.mintlify/Assistant.md` for custom instructions (done); `.mintlify/assistant/skills/` for topic skills (done) | **Yes.** The feature people expect, and the transcripts are a content-gap signal |
+| **Agent skills** | `skill.md` files the assistant loads for matching questions (≤3 per answer, ~6k tokens each) and that the MCP server exposes as resources | Pro (assistant) / Starter (MCP resources) | `.mintlify/assistant/skills/<slug>/skill.md` (done — our three published LlamaParse skills) | **Yes.** We already maintain these skills; this is free distribution |
+| **Agent feedback** (beta) | Agents connected to the MCP server report problems via `submit_feedback`; shows in the dashboard with an "Agent" badge, tagged separately from human feedback; API `source=agent` | Pro | Automatic once MCP is used; feedback add-on in dashboard | **Yes, cautiously.** Novel signal; volume unknown |
+| **Analytics** — human *and* agent | Traffic split by human/agent, assistant transcripts and satisfaction, search terms (incl. no-results), engagement funnels, CSV/S3 export; plus PostHog/GA4/etc. via `docs.json` `integrations` | Pro (agent analytics: Pro) | Dashboard; `integrations.posthog` in `docs.json` if we want events in our own PostHog | **Yes.** Answers "what do agents read?" — the number Mintlify quotes is 63% agentic traffic |
+| **Automations** | Scheduled or event-triggered agent runs that open PRs: *Update from code changes*, *Draft changelog*, *Fill gaps from assistant conversations*, *Improve docs from user feedback*, *Fix broken links*, *Fix SEO issues*, *Fix grammar & typos*, *Enforce your style guide*, *Translate content*, *Update from support feedback* | **Pro** — 250 credits per run that changes something; 0 if nothing to change; ≤500 runs/day; up to 10 context repos | Dashboard (triggers, instructions, repos); PRs land in this repo | **Probably** for *Update from code changes* against `platform` and *Fix broken links* (we found 60+ dead links in the source docs). Quality is the open question — this is the thing to test hardest |
+| **Agent** (docs-writing) | On-demand: researches connected repos and the web, plans, writes, runs CLI checks, opens a PR; invoked from dashboard or Slack | Pro | Dashboard / Slack | **Maybe.** Overlaps with our own coding-agent workflow; useful for non-engineers |
+| `<Visibility for="agents">` | Content hidden from the web page but included in `.md`/`llms.txt` (and the reverse for `humans`) | Starter | MDX component (used on the [home page](/) and [Getting started](/parse/getting_started)) | **Yes, sparingly.** API-first instructions for agents without cluttering the human page |
+| **Agent Score** | Public 30-check audit of any docs site; leaderboard; "copy prompt to fix" | Free, public | Run against any URL | **Yes** as the before/after metric for this evaluation |
+
+**Credits, for budgeting.** Pro is $450/month and includes 10,000 credits/month shared across assistant, agent and automations; overage is $0.01/credit. That is roughly 400 answered assistant questions or 40 automation runs that change something per month before overage — enough for a trial, thin for production traffic at LlamaIndex's scale. Enterprise pricing is custom.
+
+## What's prepared in this repository
+
+- `docs.json` → `contextual.options` now includes `assistant` (Ask AI on every page) and `add-mcp` (one-click MCP install) alongside copy / view-as-markdown / ChatGPT / Claude / Perplexity / Cursor / VS Code.
+- `.mintlify/Assistant.md` — custom assistant instructions: persona, v2-first SDK guidance (never recommend `llama-cloud-services` unless asked about v1), tier and version-pinning rules, escalation to support.
+- `.mintlify/assistant/skills/{llamaparse,liteparse,llamacloud-index}/skill.md` — our three published agent skills (MIT), so the assistant loads them for matching questions and the MCP server exposes them as resources.
+- `<Visibility for="agents">` blocks on the home page and Getting started: agent-facing pointers to `.md` URLs, `/llms.txt`, `/mcp`, the skills installer and the minimal REST sequence.
+- 40 redirects and a clean link graph (the *URL stability* check).
+- The changelog with RSS, and the OpenAPI-generated reference (which the MCP server can search).
+
+## Demo script for the hosted trial
+
+1. **Deploy** this repo through the Mintlify GitHub app; note the subdomain (it will be `*.mintlify.io`, not `.site`).
+2. **Run Agent Score** on the new subdomain and put it next to the 79/C baseline.
+3. **Markdown for agents:** open any page with `.md` appended; open `/llms.txt` and `/llms-full.txt`.
+4. **MCP:** use the page's "Add MCP" action to install the server in Claude Desktop or Cursor; ask it a Parse question and watch it call `search`; then ask it to file feedback and check the dashboard for the "Agent" badge.
+5. **Ask AI:** enable the assistant (Pro trial); ask the three starter questions we'd configure — "How do I pin a Parse version?", "Which tier should I use for scanned forms?", "How do I migrate from v1?" — and check that answers cite pages and prefer the v2 SDK (that is what `Assistant.md` is for). Then ask a LiteParse question to see the skill load.
+6. **Analytics:** after a day of use, review human vs agent traffic, assistant transcripts and no-result searches.
+7. **Automations:** enable *Fix broken links* (content-update trigger) and *Update from code changes* pointed at `run-llama/platform`; merge one real Parse change upstream and judge the PR it opens. This is the make-or-break test — Jack's "Draft feature docs" pitch lives here.
+
+## What this doesn't answer
+
+Answer quality of the assistant and automations, agent-feedback volume, and whether 10,000 credits is realistic for our traffic can only be measured on the hosted deployment over time. Those are the open items on the [checklist](/evaluation/checklist).

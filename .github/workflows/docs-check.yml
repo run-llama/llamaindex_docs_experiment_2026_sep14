@@ -1,0 +1,19 @@
+name: Docs check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  broken-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Pin the CLI: `mint@latest` briefly resolved to an unpublished @mintlify/cli on 2026-09-14,
+      # and older CLIs render nothing for components they don't know (e.g. <Visibility>).
+      - run: npm install -g mint@4.2.893
+      - run: mint broken-links

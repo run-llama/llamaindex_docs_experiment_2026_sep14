@@ -1,0 +1,59 @@
+---
+title: "Parse Examples"
+description: "Runnable example tutorials demonstrating Parse for common document workflows \u2014 first parse, chart extraction, financial table extraction, enriched forms output, custom prompts, batch processing, spreadsheets, and TypeScript/Node.js integration."
+---
+
+A collection of runnable tutorials for the most common Parse workflows. Each one walks through a real document end-to-end and shows the SDK calls in context. Most tutorials are Python notebooks (Jupyter, Colab); the TypeScript tutorial shows the same patterns from Node.js. If you're new to Parse, the [Getting Started](/parse/getting_started) page will give you the bare-bones first parse in 60 seconds.
+
+## Start here
+
+<Columns cols={2}>
+  <Card title="Quick Start: Parse a PDF & Interpret Outputs" href="/parse/examples/parse_pdf_outputs">
+  Python · Parse a real US Treasury financial report and interpret the four most common output views — text, markdown, items, and metadata. The best place to start if you're new to the Parse SDK.
+</Card>
+  <Card title="Parse a PDF in TypeScript" href="/parse/examples/parse_pdf_typescript">
+  TypeScript · Parse a PDF from a Node.js script — install, set the API key, run the parse, walk the markdown output, and save it to disk. The TypeScript counterpart to the Python Quick Start.
+</Card>
+</Columns>
+
+## By use case
+
+### Structured extraction
+
+<Columns cols={2}>
+  <Card title="Parse a Financial Report and Extract Every Table" href="/parse/examples/parse_financial_tables">
+  Walk every page of a real Treasury financial report, pull every table out into pandas DataFrames with source-page provenance, and turn on Cost Optimizer to keep costs down on long mixed-complexity documents.
+</Card>
+  <Card title="Parse Embedded Charts and Analyze with Pandas" href="/parse/examples/parse_charts_pandas">
+  Use specialized chart parsing to extract chart data from a financial report, then load the resulting tables into pandas for summaries, plots, and value counts.
+</Card>
+  <Card title="Enriched Forms Output (Beta)" href="/parse/examples/enriched_forms">
+  Turn on the enriched forms pass to get each form page as structured JSON — fields with values, checkbox states, and bounding boxes — and read it back with expand=forms.
+</Card>
+  <Card title="Parse and Analyze Excel Spreadsheets" href="/parse/examples/parse_excel_sheets">
+  Parse a multi-sheet XLSX template and (optionally) build a small RAG app over the rows with the LlamaIndex framework.
+</Card>
+</Columns>
+
+### Prompt engineering
+
+<Columns cols={2}>
+  <Card title="Parse with Additional Prompts" href="/parse/examples/parse_with_prompts">
+  Steer Parse with a custom prompt to focus on the parts of a document you care about. Walks through extracting just the prices from a McDonald's receipt.
+</Card>
+</Columns>
+
+### Bulk processing
+
+<Columns cols={2}>
+  <Card title="Parse All PDFs in a Folder (Async)" href="/parse/examples/async_parse_folder">
+  Batch-parse every PDF in a directory with controlled concurrency using asyncio and a semaphore. The pattern to use when you have hundreds or thousands of files.
+</Card>
+</Columns>
+
+## More resources
+
+- **Browse the SDK examples on GitHub** — for more detailed Python SDK examples, see [`run-llama/llama-cloud-py/tree/main/examples/parse`](https://github.com/run-llama/llama-cloud-py/tree/main/examples/parse).
+- **Look up an option** — see the [Input Options](/parse/guides/configuring-parse#input-options), [Output Options](/parse/guides/configuring-parse#output-options), and [Processing Options](/parse/guides/configuring-parse#processing-options) groups for prose explanations of every knob.
+- **Pick the right tier** — see the [Tiers](/parse/guides/tiers) page for guidance on `fast` vs `cost_effective` vs `agentic` vs `agentic_plus`.
+- **Understand the configuration model** — see the [Configuration Model](/parse/guides/configuring-parse) page for where every option lives in the request shape.

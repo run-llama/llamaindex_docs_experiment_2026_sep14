@@ -1,0 +1,9 @@
+# Mintlify local preview cache
+.mint/
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+# Node
+node_modules/
+*.log

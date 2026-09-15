@@ -1,0 +1,81 @@
+---
+title: "Cache options"
+description: "LlamaParse caches parsed documents for 48 hours; invalidate_cache forces a re-parse and do_not_cache skips caching a job entirely."
+---
+
+<Warning>
+**Deprecated**
+
+This page documents the deprecated Parse v1 API. For new integrations, use Parse v2. See the [v1 to v2 migration guide](/parse/guides/migration-v1-to-v2) to update existing v1 code.
+</Warning>
+
+<br />
+<br />
+
+## About cache
+
+By default LlamaParse caches parsed documents for 48 hours before permanently deleting them. The cache takes into account the parsing parameters that can have an impact on the output (such as parsing_instructions, language, and page_separators).
+
+<br />
+<br />
+
+## Cache invalidation
+
+You can invalidate the cache for a specific document by setting the `invalidate_cache` option to `True`. The cache will be cleared, the document will be re-parsed and the new parsed document will be stored in the cache.
+
+<Tabs>
+  <Tab title="Python">
+
+  ```python
+  parser = LlamaParse(
+    invalidate_cache=True
+  )
+  ```
+
+  </Tab>
+  <Tab title="API">
+
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'invalidate_cache="true"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+
+  </Tab>
+</Tabs>
+
+<br />
+<br />
+
+## Do not cache
+
+You can specify that you do not want a specific job to be cached by setting the `do_not_cache` option to `True`. In this case the document will not be added in the cache, so if you re-upload the document it will be re-processed.
+
+<Tabs>
+  <Tab title="Python">
+
+  ```python
+  parser = LlamaParse(
+    do_not_cache=True
+  )
+  ```
+
+  </Tab>
+  <Tab title="API">
+
+  ```bash
+  curl -X 'POST' \
+    'https://api.cloud.llamaindex.ai/api/v1/parsing/upload'  \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+    --form 'do_not_cache="true"' \
+    -F 'file=@/path/to/your/file.pdf;type=application/pdf'
+  ```
+
+  </Tab>
+</Tabs>

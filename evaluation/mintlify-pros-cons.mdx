@@ -1,0 +1,171 @@
+---
+title: "Mintlify: pros and cons"
+description: "What we learned building this PoC — verified findings, friction points, and what still needs the hosted product to answer."
+---
+
+This page records what we actually observed while building this site, so the decision rests on evidence rather than the sales pitch. Every claim below says how it was verified. Items we could not test locally are listed separately rather than guessed at.
+
+<Note>
+**How this site was built.** The Parse section (39 pages) was converted by script from the Starlight source in `platform/cloud-docs` at `main@9a073ef` (2026‑09‑14). On top of the faithful port we then applied the "make it better" changes: a version switcher for v1, a task‑first structure, reusable snippets for SDK scaffolding, the real OpenAPI spec with deep links from guides, redirects from the old URL space, the LlamaIndex brand theme, framed screenshots, Mermaid diagrams, the agent contextual menu, and a CI link check.
+</Note>
+
+## Summary
+
+| Area | Verdict from this PoC | Confidence |
+| --- | --- | --- |
+| Authoring & local tooling | Strong — fast preview, parse and link errors caught before push | Verified locally |
+| Migrating from Starlight | Mechanical for standard components; custom Astro widgets need hand‑mapping | Verified (39 + 1 pages) |
+| Content mechanics (snippets, components) | Strong — measurable de‑duplication, no custom React needed | Verified locally |
+| Navigation, versioning, redirects | Good; a few limitations (no regex redirects) | Verified locally |
+| API reference from OpenAPI | Strong — real spec generated 27 pages with zero hand‑written content; deep links are predictable | Verified locally (playground auth not yet) |
+| Agent readiness | Configurable menu; `llms.txt` / MCP are hosted features | Config verified, behaviour hosted‑only |
+| Theming | Brand colours, custom fonts and logo all supported from config; code font is not configurable | Verified locally |
+| Hosting, search, AI assistant, analytics, pricing | Not testable locally | Open |
+
+## 1. Authoring and local tooling
+
+**Pros**
+
+- `mint dev` gives a live preview with hot reload; every content change in this PoC appeared within a couple of seconds without a restart. Navigation and theme changes in `docs.json` also hot‑reloaded.
+- `mint broken-links` catches both dead internal links **and MDX parse errors** (it refuses to run on a page that does not compile). It surfaced six links that are broken in the *source* docs today, and it caught every conversion bug we introduced before a page was ever viewed.
+- `docs.json` has a published JSON schema, so the configuration is machine‑checkable and the schema doubled as documentation when a doc page 404'd.
+- Content is plain MDX in a git repo: it diffs, reviews and edits like code, and AI coding agents can work on it directly.
+
+**Cons**
+
+- **`npx mint@latest` was broken for part of 2026‑09‑14**: the latest `mint` depended on a `@mintlify/cli` version that had not been published (npm `ETARGET`). A pinned global install worked, and the gap was closed later the same day (`mint@4.2.893`). Lesson: pin the CLI version in CI (done in `.github/workflows/docs-check.yml`).
+- **An older CLI silently drops components it doesn't know.** On `mint@4.2.387` the `<Visibility>` component rendered *nothing* for either audience — no error, no warning, the content just vanished from the page; `mint broken-links` passed. On `4.2.893` it works. Because the hosted platform is always current, this is a local‑preview trap rather than a production one, but it means "it looked fine locally" is only meaningful on a current CLI.
+- MDX is stricter than Markdown. Two failure modes bit us repeatedly during conversion: callout content on the same line as its opening tag, and code fences indented four or more spaces inside a JSX element (rendered as an indented code block, silently). Both are MDX behaviours rather than Mintlify bugs, but they are the tax for choosing MDX.
+- Some pages in Mintlify's own docs returned 404 (`/navigation/versions`); the information existed elsewhere, but discoverability cost time.
+- The dev server logs `SyntaxError: Unexpected end of JSON input` whenever `docs.json` is rewritten non‑atomically (we hit it four times, once per scripted rewrite): the file watcher reads the config mid‑write. It never broke rendering — the next reload picked up the finished file — but the error is noisy, and a script that writes `docs.json` should write to a temp file and rename.
+
+## 2. Migrating from the current Starlight site
+
+**Pros**
+
+- Standard Starlight constructs map one‑to‑one: `Tabs/TabItem → Tabs/Tab`, `Aside → Note/Tip/Warning`, `LinkCard → Card`, `CardGrid → Columns`, `:::` directives → callouts. The 39‑page Parse section converted by script with **zero manual edits**, and the converter is reusable per section.
+- Broken links in the source were exposed immediately rather than silently carried over.
+- The same converter emits a redirect map from the old `/llamaparse/...` URL space, so URL preservation is a by‑product of migration rather than a separate project.
+
+**Cons**
+
+- Custom Astro components have no counterpart and need page‑specific handling: `LanguageSelect` / `CopyAgentContext` (the per‑language "copy for your agent" widget on the quickstart) were rewritten as a `CodeGroup`; `ProtectedPage` (the password gate on self‑hosting docs) would need Mintlify's authentication feature, which is a hosted/plan feature we have not tested.
+- Sections outside this repo (LlamaAgents, framework) are not covered by this converter; a multi‑repo setup is a hosted feature (Mintlify offers it) that we have not exercised.
+- Starlight's `sidebar.order` frontmatter has no equivalent — ordering lives entirely in `docs.json`. That is arguably cleaner, but it means navigation is a separate artifact that must be regenerated or edited when pages move.
+
+## 3. Content mechanics
+
+**Pros**
+
+- **Reusable snippets** work exactly as advertised: any file under `/snippets` can be imported as a component and can contain code blocks or a `CodeGroup`; snippets accept props, including inside fenced code. In the Parse section we replaced **70 duplicated code blocks across 10 pages** (install, API key, client initialisation in five languages) with ten snippet files. Changing the SDK version is now a one‑file edit.
+- The duplication analysis itself was telling: the same `pip install` line existed in **nine different variants** across 13 pages in the source docs. Snippets are the structural fix for that drift.
+- Built‑in components covered everything the Parse docs needed — callouts, tabs, code groups, cards/columns, frames, accordions, parameter/response fields, Mermaid — with no custom React. See the [component showcase](/evaluation/component-showcase).
+- Mermaid renders natively; we added a job‑lifecycle diagram to *Retrieving results* and a pipeline diagram on the landing page with no plugin.
+
+**Cons**
+
+- Snippets are not supported in Mintlify's web editor (CLI or git only). Not a problem for an engineering‑owned docs repo, but it rules out the web editor for pages that use them.
+- Only the *exact* most common variant of each scaffold block was safe to replace automatically; the other variants (for example `llama-cloud>=2.15` on one page) were left as‑is because they may be intentional. Deciding which variants are drift and which are deliberate is editorial work, not tooling.
+- Mintlify code blocks take a plain title after the language (` ```python Python `); there is no `title="…"` syntax, so any tooling that emits the other form needs adjusting.
+
+## 4. Navigation, versioning and redirects
+
+**Pros**
+
+- `navigation.versions` gives a version dropdown with fully independent tabs/groups per version. Moving the 21 legacy v1 pages behind a **v1 (legacy)** version halved the default sidebar and removed 22 "Deprecated" banners from the reader's first impression, with no content change.
+- Tabs, nested groups, icons and `sidebarTitle` overrides were enough to build the task‑first structure (Get started → Solve a problem → Reference → Migrate) without touching page files.
+- `redirects` is a first‑class config array (`source`, `destination`, optional `permanent`); we generated 40 entries covering the old URL space automatically.
+
+**Cons**
+
+- Redirects are exact‑match only — no regex or wildcard in the schema. A large migration will produce a long list, and path *patterns* (for example `/llamaparse/parse/:slug`) cannot be expressed.
+- How search treats non‑default versions is not documented on the page we could find, and cannot be verified locally.
+- A page can only sensibly live in one version's navigation; the v1 → v2 migration guide had to be placed in v2, so a v1 reader reaches it through a link rather than the sidebar.
+
+## 5. API reference from OpenAPI
+
+**Pros**
+
+- LlamaCloud already publishes its spec at `api.cloud.llamaindex.ai/api/openapi.json` (OpenAPI 3.1, 148 paths, 416 schemas). Filtered to the Parse v2, Parsing v1 and Files operations (27 operations, 104 schemas after pruning unused components), Mintlify generated **27 reference pages with zero hand‑written content**, grouped by tag.
+- Generated URLs are predictable — `/api-reference/<tag>/<summary-slug>` — which let us **deep‑link nine endpoint mentions in the guides** and add "Related API endpoints" cards to three reference pages by script. Guides and reference now cross‑reference instead of living in separate sites.
+- Bearer auth is declared in the spec, so the playground picks it up without extra config.
+
+**Cons**
+
+- The full spec is 700 KB; publishing it unfiltered would produce well over a hundred pages across every LlamaCloud product. Per‑product filtering (and pruning unused schemas) is a small script but it is our responsibility, and it must be re‑run when the upstream spec changes.
+- Slugs derive from each operation's `summary`. Renaming a summary upstream silently changes the reference URL and breaks any deep link to it — the CI link check will catch it, but it is a coupling to be aware of.
+- The interactive "Try it" playground against the real API with a bearer token has **not** been exercised in this PoC yet.
+
+## 6. Agent readiness
+
+**Pros**
+
+- The contextual page menu is a one‑line config: we enabled *copy page, view as markdown, open in ChatGPT / Claude / Perplexity / Cursor / VS Code, and MCP* from `docs.json`.
+- `llms.txt`, per‑page markdown export and an MCP endpoint are generated by the hosted platform; the July deployment exposed `llms.txt` without any configuration.
+- Because every page is plain MDX with explicit headings, the content already reads well as retrieved chunks; the snippet/`CodeGroup` restructuring makes code examples self‑contained.
+
+- Repo‑side configuration for the hosted features is small and versioned: `.mintlify/Assistant.md` (custom assistant instructions), `.mintlify/assistant/skills/*/skill.md` (our existing LlamaParse agent skills, loaded by the assistant and exposed over MCP), and `<Visibility for="agents">` blocks. See [Agent‑native features](/evaluation/agent-features) for the full survey and demo script.
+- Mintlify's public Agent Score grades the current site **79/100 (C)**; four of its six failing checks (Markdown availability, `llms-full.txt`, `skill.md`, URL stability) are satisfied automatically by a Mintlify deployment — a clean before/after.
+
+**Cons**
+
+- **None of the agent‑native features run locally.** `mint dev` returns 404 for `/llms.txt`, page `.md` URLs, `/mcp`, RSS, the assistant and feedback; the July trial deployment has since been removed. Every claim in this area has to be verified on a fresh hosted deployment.
+- **Plan gating is real.** The free Starter tier includes the MCP server, `llms.txt`, contextual menu and authentication, but the assistant, agent, automations, analytics (human *and* agent) and preview deployments all need **Pro at $450/month**, with 10,000 shared credits (assistant 25/answer, automations 250/changing run, $0.01/credit overage). At LlamaIndex's traffic, credit consumption is an unknown that a trial must measure.
+- Assistant customisation is instructions‑only (`Assistant.md` augments the system prompt; no model choice, no override of defaults). Agent feedback is beta, and agents only reach `submit_feedback` when connected to the MCP server — ordinary web‑fetching agents never see it.
+- Automations' value depends entirely on output quality against our `platform` monorepo, which has not been tested; the credit model (250 per changing run) is fine for scheduled batches but adds up for per‑PR triggers.
+
+## 6b. Changelog
+
+**Pros**
+
+- A changelog is a built‑in content type, not a template to maintain: a page of `<Update label description tags>` entries renders as a dated timeline with per‑entry anchors and tag filters (the selected tags are reflected in the URL, so a filtered view is shareable). `rss: true` in the frontmatter exposes an RSS feed at `/changelog/rss.xml` that Slack or email tooling can subscribe to.
+- We seeded the [Changelog](/changelog) tab from real, dated GitHub releases of the four SDK repos, so the feature was tested on genuine content rather than placeholders. Following the editorial pattern of [Exa's changelog](https://exa.ai/docs/changelog) (also on Mintlify), the generator strips commit hashes, PR numbers and internal ticket IDs, drops maintenance‑only items, maps commit scopes to product areas (Parse, Extract, Split…), and collapses a change shipped in four SDKs on the same day into one bullet. Raw release‑please output is not fit for readers; a small editorial layer is. In practice that layer had three parts: mechanical cleanup (references, formatting of paths and identifiers as code — also required because MDX parses `{job_id}` in prose as an expression), a noise filter for release‑engineering and web‑app items that leak into SDK release notes, and a short reword list for lines written in engineer‑speak. The first two automate; the third is editorial and needs an owner.
+
+**Cons**
+
+- The feature is only as good as the content pipeline behind it, and that pipeline is ours: there is no public LlamaCloud docs changelog today (the only one is behind sign‑in in the app). The platform repo's internal `release-changelog` skill already drafts eng, sales and BYOC lenses from merged PRs — a fourth "public docs" lens feeding this page is the obvious next step, but it does not exist yet.
+- RSS entries are plain Markdown only; components and HTML inside an update are dropped from the feed, and each Markdown heading inside an update becomes its own feed entry, which constrains how entries are written.
+- `/changelog/rss.xml` returns 404 on the local `mint dev` server, so the feed could only be verified on a hosted deployment — another item for the hosted checklist.
+
+## 7. Theming and brand
+
+**Pros**
+
+- Brand colours (`#3E18F9` / `#92AEFF`), a self‑hosted variable font (Overused Grotesk via a public `woff2` URL), light/dark logos, favicon and the Off White page background were all applied from `docs.json` alone.
+- Light/dark mode is automatic and follows the system preference.
+
+**Cons**
+
+- **Custom fonts inherit Inter‑specific tuning.** The theme sets `font-feature-settings: "cv02", "cv03", "cv04", "cv11"` globally — sensible defaults for Inter, its stock font. Overused Grotesk uses the same `cv03`/`cv04` tags for *circled and boxed figures*, so every digit on the site rendered as "②" until we reset the feature settings in a custom stylesheet. This is subtle (letters look perfect; only numbers are wrong) and it will bite any team bringing a font with character variants. Fixed in `style.css`; Mintlify auto‑loads any `.css` file in the content directory.
+- `fonts` in `docs.json` supports only `heading` and `body`; the code/mono font is not configurable, so IBM Plex Mono from the brand system had to be applied via the same custom stylesheet rather than config.
+- Deeper brand devices (gradient segmentation, line‑art illustrations, the white‑card‑on‑off‑white page envelope) would need custom CSS or components; the default theme is clean but generic.
+
+## 8. Hosting and operations (from the July trial)
+
+**Pros**
+
+- The GitHub app deploys on push to the default branch; a commit received a "Mintlify Deployment — success" check within about a minute, and the deploy status linked to the live URL.
+- Every deployment gets a subdomain; preview deployments for branches are available.
+
+**Cons**
+
+- The trial subdomain was confusing: `llamaindex‑….mintlify.site` returned 404 for everything while the real deployment lived at `….mintlify.io`. We lost time diagnosing a "broken deploy" that was a wrong hostname.
+- Password‑gating a section (as the current site does for self‑hosting) is a hosted authentication feature, not repo config; it has not been tested.
+
+## 9. Not verifiable in this PoC
+
+These remain open and need the hosted product or the vendor:
+
+- Search quality on the real content, and search behaviour across versions
+- Built‑in AI assistant answer quality
+- Analytics (human and agent), search‑no‑results reporting
+- "Try it" playground with a real bearer token
+- Custom domain (`docs.llamaindex.ai`) and redirect behaviour at the edge
+- Page‑level authentication for self‑hosting docs
+- Multi‑repo deployment (LlamaAgents / framework docs live in other repos)
+- Automations (doc drafts from code changes) — hosted and plan‑gated
+- Pricing tier fit; which of the above are gated behind which tier
+
+## 10. Lock‑in assessment
+
+Content is plain MDX in our repository, and the Mintlify‑specific surface is small and enumerable: `docs.json`, the component names (`Tabs`, `Card`, `Note`, `CodeGroup`, `Frame`, `Columns`), the `/snippets` import convention, and the generated API‑reference URLs. Leaving Mintlify would mean re‑mapping those to another MDX‑based system — comparable to the Starlight → Mintlify conversion done here, which was a script and a few manual fixes. Hosting, search, the assistant and analytics are the parts that would actually be lost.

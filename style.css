@@ -1,0 +1,27 @@
+/*
+ * Brand overrides that docs.json cannot express.
+ *
+ * 1. Digits: Mintlify's theme enables Inter's character variants (cv03/cv04 …).
+ *    Overused Grotesk uses those same feature tags for circled/boxed figures,
+ *    so "v2" renders as "v②". Reset to the font's defaults everywhere.
+ * 2. Code font: docs.json only configures heading/body fonts; the brand system
+ *    pairs Overused Grotesk with IBM Plex Mono for code and labels.
+ */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root,
+body,
+body * {
+  font-feature-settings: normal;
+  font-variant-numeric: normal;
+}
+
+code,
+kbd,
+samp,
+pre,
+pre *,
+.font-mono,
+[class*="language-"] {
+  font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}

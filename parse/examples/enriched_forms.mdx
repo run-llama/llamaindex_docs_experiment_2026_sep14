@@ -1,0 +1,448 @@
+---
+title: "Enriched Forms Output: Fields, Checkbox States, and Fillable Grids (Beta)"
+description: "Turn on the enriched forms pass with processing_options.forms=\"enrich\" to get each form page from Parse as structured JSON of sections, fields with values and checkbox states, fillable grids, and bounding boxes, and read it back with expand=forms."
+---
+
+import ApiKeyShell from "/snippets/api-key-shell.mdx";
+import ClientInitGo from "/snippets/client-init-go.mdx";
+import ClientInitJava from "/snippets/client-init-java.mdx";
+import ClientInitPython from "/snippets/client-init-python.mdx";
+import ClientInitTypescript from "/snippets/client-init-typescript.mdx";
+import InstallCli from "/snippets/install-cli.mdx";
+import InstallGo from "/snippets/install-go.mdx";
+import InstallTypescript from "/snippets/install-typescript.mdx";
+
+**Beta**
+
+This example shows how to get every form page as **structured JSON** — sections, labeled fields with their entered values and checkbox states, and fillable grids, each field with a bounding box — alongside the regular markdown and `items` output Parse returns, and how to read that JSON back off the result.
+
+Use this when you need to:
+
+- Load filled forms into your own system, keyed by the field ids printed on the form (`1a`, `Part III`, box `13`).
+- Tell blank fields from filled ones, and read checkbox and signature state directly instead of inferring it from text.
+- Build a review UI that highlights where on the page each field value came from.
+
+**The form pass is an additional step alongside normal parsing.** Parse detects which pages are forms and runs the enriched form pass only on those pages.
+
+Using enriched forms is straightforward: parse with `forms: "enrich"` set, then read `forms` off the result — inline with `expand=["forms"]`, or as a downloadable file with `expand=["forms_content_metadata"]`. 
+
+Each page containing a form adds **10 credits** on top of the tier price. Pages with no form detected are returned with an empty `forms` list and incur no additional cost.
+
+
+<Note>
+**Beta**
+
+Enriched forms output is in beta. It is being actively improved. The output shape and field vocabulary may still change.
+</Note>
+
+
+## 1. Setup
+
+Set your API key so the SDKs pick it up automatically:
+
+<ApiKeyShell />
+
+<Tabs>
+<Tab title="Python">
+
+Install the SDK:
+
+```bash
+pip install "llama-cloud>=2.15"
+```
+
+<ClientInitPython />
+
+</Tab>
+<Tab title="TypeScript">
+
+Install the SDK:
+
+<InstallTypescript />
+
+<ClientInitTypescript />
+
+</Tab>
+<Tab title="Go">
+
+Install the SDK:
+
+<InstallGo />
+
+<ClientInitGo />
+
+</Tab>
+<Tab title="Java">
+
+Add the SDK to your build:
+
+```kotlin
+implementation("ai.llamaindex:llama-cloud:1.6.0")
+```
+
+<ClientInitJava />
+
+</Tab>
+<Tab title="CLI">
+
+Install the CLI:
+
+<InstallCli />
+
+`llp` reads `LLAMA_CLOUD_API_KEY` from the environment (or pass `--api-key`).
+
+</Tab>
+<Tab title="cURL">
+
+Nothing to install. The commands below use `curl` and `jq`, and read `LLAMA_CLOUD_API_KEY` from the environment.
+
+</Tab>
+</Tabs>
+
+## 2. Parse with `forms: "enrich"`
+
+Set `processing_options.forms` to `"enrich"` and add `forms` to `expand`. This is the only necessary request-side change. The pass can run on `cost_effective`, `agentic`, and `agentic_plus` tiers.
+
+In Python and TypeScript the SDK blocks until the job finishes; in Go, Java, the CLI, and cURL you create the job, poll until it reaches a terminal status, then fetch the result.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+# 1) Upload the file
+file = client.files.create(file="wage-statement-2024.pdf", purpose="parse")
+
+# 2) Parse with the form pass on, and ask for the structured JSON back
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    processing_options={"forms": "enrich"},
+    expand=["forms"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+import fs from 'fs';
+
+// 1) Upload the file
+const file = await client.files.create({
+  file: fs.createReadStream('wage-statement-2024.pdf'),
+  purpose: 'parse',
+});
+
+// 2) Parse with the form pass on, and ask for the structured JSON back
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  processing_options: { forms: 'enrich' },
+  expand: ['forms'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+// 1) Upload the file
+f, err := os.Open("wage-statement-2024.pdf")
+if err != nil {
+	log.Fatal(err)
+}
+defer f.Close()
+file, err := client.Files.New(ctx, llamacloud.FileNewParams{
+	File:    f,
+	Purpose: "parse",
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+// 2) Parse with the form pass on
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	ProcessingOptions: llamacloud.ParsingNewParamsProcessingOptions{
+		Forms: "enrich",
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+// expand is a GET parameter — poll until terminal, then fetch the forms JSON
+getParams := llamacloud.ParsingGetParams{Expand: []string{"forms"}}
+result, err := client.Parsing.Get(ctx, job.ID, getParams)
+if err != nil {
+	log.Fatal(err)
+}
+for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+	time.Sleep(2 * time.Second)
+	result, err = client.Parsing.Get(ctx, job.ID, getParams)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+if result.Job.Status != "COMPLETED" {
+	log.Fatalf("parse ended as %s", result.Job.Status)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+// 1) Upload the file
+FileCreateResponse file = client.files().create(FileCreateParams.builder()
+        .file(Paths.get("wage-statement-2024.pdf"))
+        .purpose("parse")
+        .build());
+
+// 2) Parse with the form pass on
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .processingOptions(ParsingCreateParams.ProcessingOptions.builder()
+                .forms(ParsingCreateParams.ProcessingOptions.Forms.ENRICH)
+                .build())
+        .build());
+
+// expand is a query parameter — poll until terminal, then fetch the forms JSON
+ParsingGetParams getParams = ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("forms")
+        .build();
+ParsingGetResponse result = client.parsing().get(getParams);
+while (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+    Thread.sleep(2000);
+    result = client.parsing().get(getParams);
+}
+if (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+    throw new RuntimeException("parse ended as " + result.job().status());
+}
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+# Upload the document
+FILE_ID=$(llp files create \
+  --file wage-statement-2024.pdf \
+  --purpose parse | jq -r '.id')
+
+# Start a parse job with the form pass on
+JOB_ID=$(llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --processing-options.forms enrich | jq -r '.id')
+
+# Poll until the job reaches a terminal status
+while true; do
+  STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+
+# Fetch the forms JSON
+llp parsing get --job-id "$JOB_ID" --expand forms | jq '.forms.pages[]'
+```
+
+</Tab>
+<Tab title="cURL">
+
+Upload the file, start the job with `forms` enabled, poll the result endpoint until `job.status` reaches a terminal state, then fetch the structured JSON with `expand=forms`:
+
+```bash
+FILE_ID=$(curl -s -X POST 'https://api.cloud.llamaindex.ai/api/v1/beta/files' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+  -F 'purpose=parse' \
+  -F 'file=@wage-statement-2024.pdf;type=application/pdf' | jq -r '.id')
+
+JOB_ID=$(curl -s -X POST 'https://api.cloud.llamaindex.ai/api/v2/parse' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" \
+  --data "{
+    \"file_id\": \"$FILE_ID\",
+    \"tier\": \"agentic\",
+    \"version\": \"latest\",
+    \"processing_options\": { \"forms\": \"enrich\" }
+  }" | jq -r '.id')
+
+# Poll until the job reaches a terminal status
+while true; do
+  STATUS=$(curl -s "https://api.cloud.llamaindex.ai/api/v2/parse/$JOB_ID" \
+    -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+[ "$STATUS" = "COMPLETED" ] || { echo "parse ended as $STATUS" >&2; exit 1; }
+
+# Fetch the forms JSON
+curl -s "https://api.cloud.llamaindex.ai/api/v2/parse/$JOB_ID?expand=forms" \
+  -H "Authorization: Bearer $LLAMA_CLOUD_API_KEY"
+```
+
+</Tab>
+</Tabs>
+
+In the Web UI, turn on **Enriched forms output** under **Processing Options > Forms** in the parse settings. (Currently only visible for paid accounts.) Once a document is parsed, the result page gains a **Forms** tab that shows the structured JSON and highlights each field on the page.
+
+
+<Warning>
+**Not available on `fast`**
+
+The `fast` tier runs no form-analysis pass. Requesting `forms: "enrich"` on `fast` returns a validation error.
+</Warning>
+
+
+## 3. Read the `forms` result
+
+
+The remaining steps — reading the structured JSON off the result and walking its fields — are shown in Python. The `forms` shape is identical across every SDK and in the raw JSON; only the field-access syntax differs.
+
+`result.forms.pages` has one entry per page of the document. This trimmed excerpt is from a filled W-2:
+
+```json
+{
+  "pages": [
+    {
+      "page_number": 1,
+      "page_width": 612,
+      "page_height": 792,
+      "success": true,
+      "forms": [
+        {
+          "json": [
+            {
+              "type": "field", "field": "text", "id": "1",
+              "label": "Wages, tips, other compensation", "value": "29,513",
+              "bbox": [{ "x": 349.2, "y": 96.5, "w": 114.0, "h": 12.2 }]
+            },
+            {
+              "type": "field", "field": "text", "id": "d",
+              "label": "Control number", "isEmpty": true,
+              "bbox": [{ "x": 38.1, "y": 167.8, "w": 291.8, "h": 12.3 }]
+            },
+            {
+              "type": "field", "field": "multi_select", "id": "13",
+              "valueItems": [
+                { "type": "field", "field": "checkbox", "label": "Statutory employee", "value": true },
+                { "type": "field", "field": "checkbox", "label": "Retirement plan", "value": false },
+                { "type": "field", "field": "checkbox", "label": "Third-party sick pay", "value": false }
+              ]
+            },
+            {
+              "type": "section", "id": "15",
+              "items": [
+                { "type": "field", "field": "text", "label": "State", "value": "SC" },
+                { "type": "field", "field": "text", "label": "Employer's state ID number", "value": "00-0000056" }
+              ]
+            }
+          ],
+          "list": {
+            "type": "list",
+            "ordered": false,
+            "md": "- [1] Wages, tips, other compensation: 29,513\n- [d] Control number:\n- [13]\n  - [x] Statutory employee\n  - [ ] Retirement plan\n  - [ ] Third-party sick pay\n- [15]\n  - State: SC\n  - Employer's state ID number: 00-0000056",
+            "items": [ ... ]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Each form carries the same content in two representations: `json`, the structured JSON, and `list`, a flattened bullet list whose `md` drops straight into a prompt.
+
+The structured JSON has three node types:
+
+| `type` | Fields | Meaning |
+| --- | --- | --- |
+| `section` | `id`, `label`, `items` | A grouping printed on the form (`Part III`, box `15`). `items` holds child nodes in reading order. |
+| `field` | `field`, `id`, `label`, `value`, `isEmpty`, `valueItems`, `bbox` | One entry. `field` is `text`, `checkbox`, `single_select`, `multi_select`, or `signature`. |
+| `table` | `id`, `label`, `columns`, `rows`, `bbox` | A fillable grid. Each cell is a string, `null` when blank, or `{ "items": [...] }` holding the cell's own nodes (a checkbox column, for example). |
+
+How `value` reads depends on the field kind:
+
+- **`text`** — `value` is the entered text, verbatim. A printed-but-blank field has `isEmpty: true` and no `value`.
+- **`checkbox`** and **`signature`** — `value` is a boolean, indicating checked or signed, respectively.
+- **`single_select`** and **`multi_select`** — no `value` directly. Instead, `valueItems` lists the options. An option is usually a `checkbox` field with its own boolean `value` and printed `label`, but it can also be a `text` field, or a one-level `section` grouping an unlabeled checkbox with its write-in `text` field (a "check the box and enter the name" choice) — the printed caption is then the section's `label`.
+
+`bbox` holds one or more boxes around the field's fillable area, in the same page-point coordinate space as the `items` output. `page_width` and `page_height` on the page entry give the dimensions of the page. Scale to a screenshot's pixel size the same way as in the [granular bounding boxes example](/parse/examples/parse_granular_bboxes#7-render-boxes-on-the-page-screenshot).
+
+**Always check `success` before reading the `forms` result.** A page whose form pass failed comes back as `{ "page_number": N, "success": false, "error": "..." }`, has its markdown and items marked as failed, and counts toward the job's page error tolerance like any other failed page. A page whose form pass and standard Parse pass both fail is not double-counted toward error tolerance.
+
+## 4. Walk the structured JSON
+
+Since sections can nest and a table cell can hold form fields (a checkbox column, for example), you should descend into both to reach every field:
+
+```python
+def fields(nodes):
+    """Yield every field in a form's structured JSON, descending into sections and table cells."""
+    for node in nodes:
+        if node.type == "section":
+            yield from fields(node.items)
+        elif node.type == "table":
+            for row in node.rows:
+                for cell in row:
+                    if cell is not None and not isinstance(cell, str):
+                        yield from fields(cell.items)
+        elif node.type == "field":
+            yield node
+
+
+for page in result.forms.pages:
+    if not page.success:
+        print(f"page {page.page_number} failed: {page.error}")
+        continue
+    for form in page.forms:
+        for field in fields(form.json_):
+            if field.field in ("single_select", "multi_select"):
+                # An option is a checkbox, a text field, or a section grouping a
+                # checkbox with its write-in; it is chosen when a checkbox in it is checked.
+                chosen = [
+                    opt.label
+                    for opt in field.value_items or []
+                    if any(f.field == "checkbox" and f.value for f in fields([opt]))
+                ]
+                print(f"[{field.id}] {field.label}: {chosen}")
+            else:
+                print(f"[{field.id}] {field.label}: {field.value!r}")
+```
+
+Two naming differences in the Python SDK: camelCase fields from the API response are exposed in snake_case (`valueItems` is `value_items`, `isEmpty` is `is_empty`), and the `json` field is exposed as `json_` because the bare name would collide with a method on the SDK's model classes. The raw response and the TypeScript SDK use the API's camelCase field names.
+
+## 5. Download the forms file
+
+For long documents, request a presigned URL instead of the inline JSON. When `forms: "enrich"` is set, `expand=["forms_content_metadata"]` adds a `forms` entry under `result_content_metadata`, carrying `size_bytes`, an `exists` flag, and a `presigned_url`. The entry is absent when the job never ran the form pass — the option was not set, or the job predates enriched forms — so you should guard the key access:
+
+```python
+result = client.parsing.get(job_id=result.job.id, expand=["forms_content_metadata"])
+
+forms_file = (result.result_content_metadata or {}).get("forms")
+if forms_file is None:
+    raise RuntimeError('Forms file missing — was `forms: "enrich"` set?')
+
+print(f"Forms file: {forms_file.size_bytes} bytes")
+print(f"URL:        {forms_file.presigned_url}")
+```
+
+The file has the same `{ "pages": [...] }` shape as the inline result.
+
+> **Presigned URLs are temporary.** Download promptly, or call `client.parsing.get(job_id=...)` again to generate a fresh URL.
+
+## See also
+
+- [Configuring Parse → Enriched forms output](/parse/guides/configuring-parse#enriched-forms-output-beta) — request-side reference
+- [Retrieving Results](/parse/guides/retrieving-results) — every `expand` value, including `forms` and `forms_content_metadata`
+- [Granular bounding boxes](/parse/examples/parse_granular_bboxes) — word, line, and cell boxes for the rest of the page

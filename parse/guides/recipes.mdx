@@ -1,0 +1,1481 @@
+---
+title: "Recipes"
+description: "Short, copy-pasteable Parse snippets for common workflows \u2014 retries, S3 uploads, webhooks, multi-language OCR, page ranges, pandas tables, multimodal screenshots."
+---
+
+import ApiKeyShell from "/snippets/api-key-shell.mdx";
+import InstallCli from "/snippets/install-cli.mdx";
+import InstallGo from "/snippets/install-go.mdx";
+import InstallJava from "/snippets/install-java.mdx";
+import InstallPython from "/snippets/install-python.mdx";
+import InstallTypescript from "/snippets/install-typescript.mdx";
+
+**Short, copy-pasteable snippets for the patterns Parse users hit most often.** Each recipe is ~10-20 lines and answers a specific "how do I do X?" question. Drop them into your project and adapt as needed.
+
+For full walk-throughs, see the [Parse Examples](/parse/examples/overview) tutorials. For the full API reference, see the [REST API Guide](/parse/guides/api-reference).
+
+Set your API key once so the SDKs and CLI pick it up automatically:
+
+<ApiKeyShell />
+
+Every recipe below assumes you've constructed a client and uploaded a `file`:
+
+<Tabs>
+<Tab title="Python">
+
+<InstallPython />
+
+```python
+from llama_cloud import LlamaCloud
+
+client = LlamaCloud()  # reads LLAMA_CLOUD_API_KEY from the environment
+file = client.files.create(file="doc.pdf", purpose="parse")
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+<InstallTypescript />
+
+```typescript
+import LlamaCloud from '@llamaindex/llama-cloud';
+import fs from 'fs';
+
+const client = new LlamaCloud(); // reads LLAMA_CLOUD_API_KEY from the environment
+const file = await client.files.create({
+  file: fs.createReadStream('doc.pdf'),
+  purpose: 'parse',
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+<InstallGo />
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	llamacloud "github.com/run-llama/llama-parse-go"
+)
+
+func main() {
+	ctx := context.Background()
+	client := llamacloud.NewClient() // reads LLAMA_CLOUD_API_KEY from the environment
+
+	f, err := os.Open("doc.pdf")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	file, err := client.Files.New(ctx, llamacloud.FileNewParams{
+		File:    f,
+		Purpose: "parse",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// ... a recipe goes here, using ctx, client, and file ...
+	_ = file
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+<InstallJava />
+
+```java
+import ai.llamaindex.llamacloud.client.LlamaCloudClient;
+import ai.llamaindex.llamacloud.client.okhttp.LlamaCloudOkHttpClient;
+import ai.llamaindex.llamacloud.core.JsonValue;
+import ai.llamaindex.llamacloud.models.files.FileCreateParams;
+import ai.llamaindex.llamacloud.models.files.FileCreateResponse;
+import ai.llamaindex.llamacloud.models.parsing.ParsingCreateParams;
+import ai.llamaindex.llamacloud.models.parsing.ParsingCreateResponse;
+import ai.llamaindex.llamacloud.models.parsing.ParsingGetParams;
+import ai.llamaindex.llamacloud.models.parsing.ParsingGetResponse;
+import ai.llamaindex.llamacloud.models.parsing.ParsingLanguages;
+import java.nio.file.Paths;
+
+LlamaCloudClient client = LlamaCloudOkHttpClient.fromEnv();
+FileCreateResponse file = client.files().create(FileCreateParams.builder()
+        .file(Paths.get("doc.pdf"))
+        .purpose("parse")
+        .build());
+```
+
+</Tab>
+<Tab title="CLI">
+
+<InstallCli />
+
+```bash
+# llp reads LLAMA_CLOUD_API_KEY from the environment
+FILE_ID=$(llp files create --file doc.pdf --purpose parse | jq -r '.id')
+```
+
+</Tab>
+</Tabs>
+
+
+<Note>
+**Where expand lives**
+
+Python and TypeScript pass `expand` straight to the blocking `parse()` call. In Go, Java, and the CLI, `expand` is a parameter on the **result** endpoint, so those three create the job, poll until it reaches a terminal status, then fetch the result with the fields they want. Every recipe below follows that split.
+</Note>
+
+
+## Parse a document end-to-end
+
+The bare minimum: upload a file, parse it, print the markdown.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    expand=["markdown"],
+)
+print(result.markdown.pages[0].markdown)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  expand: ['markdown'],
+});
+console.log(result.markdown.pages[0].markdown);
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+// expand is a GET parameter in Go — request markdown when you poll for the result
+getParams := llamacloud.ParsingGetParams{Expand: []string{"markdown"}}
+result, err := client.Parsing.Get(ctx, job.ID, getParams)
+if err != nil {
+	log.Fatal(err)
+}
+for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+	time.Sleep(2 * time.Second)
+	result, err = client.Parsing.Get(ctx, job.ID, getParams)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+if result.Job.Status != "COMPLETED" {
+	log.Fatalf("parse ended as %s", result.Job.Status)
+}
+
+fmt.Println(result.Markdown.Pages[0].Markdown)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .build());
+
+// expand is a query parameter in Java — request markdown when you poll for the result
+ParsingGetParams getParams = ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("markdown")
+        .build();
+
+ParsingGetResponse result = client.parsing().get(getParams);
+while (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+    Thread.sleep(2000);
+    result = client.parsing().get(getParams);
+}
+if (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+    throw new RuntimeException("parse ended as " + result.job().status());
+}
+
+System.out.println(result.markdown().get().pages().get(0).asMarkdownResult().markdown());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+JOB_ID=$(llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest | jq -r '.id')
+
+# Poll until the job reaches a terminal status
+while true; do
+  STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+
+# Print the markdown for the first page
+llp parsing get --job-id "$JOB_ID" --expand markdown \
+  | jq -r '.markdown.pages[0].markdown'
+```
+
+</Tab>
+</Tabs>
+
+## Pin a version for production
+
+Use a dated `version` so model updates can't change your output without your knowledge.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="2026-04-06",  # pin a specific date
+    expand=["markdown"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: '2026-04-06', // pin a specific date
+  expand: ['markdown'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersion("2026-04-06"), // pin a specific date
+})
+if err != nil {
+	log.Fatal(err)
+}
+// poll job.ID until COMPLETED, then fetch with expand (see "Parse a document end-to-end")
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version("2026-04-06") // pin a specific date
+        .build());
+// poll job.id() until COMPLETED, then fetch with expand (see "Parse a document end-to-end")
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version 2026-04-06   # pin a specific date
+```
+
+</Tab>
+</Tabs>
+
+See [Tiers → Versioning and reproducibility](/parse/guides/tiers#versioning-and-reproducibility) for the latest available dates.
+
+## Parse only specific pages
+
+Skip irrelevant pages and save credits.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    page_ranges={"target_pages": "1,3,5-10"},  # 1-indexed
+    expand=["markdown"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  page_ranges: { target_pages: '1,3,5-10' }, // 1-indexed
+  expand: ['markdown'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	PageRanges: llamacloud.ParsingNewParamsPageRanges{
+		TargetPages: llamacloud.String("1,3,5-10"), // 1-indexed
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .pageRanges(ParsingCreateParams.PageRanges.builder()
+                .targetPages("1,3,5-10") // 1-indexed
+                .build())
+        .build());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --page-ranges.target-pages '1,3,5-10'   # 1-indexed
+```
+
+</Tab>
+</Tabs>
+
+You can also cap the total with `max_pages` (`--page-ranges.max-pages` on the CLI).
+
+## Crop headers and footers from every page
+
+Strip a fixed margin off the top and bottom of every page before parsing.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    crop_box={"top": 0.08, "bottom": 0.08, "left": 0, "right": 0},
+    expand=["markdown"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  crop_box: { top: 0.08, bottom: 0.08, left: 0, right: 0 },
+  expand: ['markdown'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	CropBox: llamacloud.ParsingNewParamsCropBox{
+		Top:    llamacloud.Float(0.08),
+		Bottom: llamacloud.Float(0.08),
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .cropBox(ParsingCreateParams.CropBox.builder()
+                .top(0.08)
+                .bottom(0.08)
+                .build())
+        .build());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --crop-box.top 0.08 \
+  --crop-box.bottom 0.08
+```
+
+</Tab>
+</Tabs>
+
+Values are page-height/width ratios (0.0–1.0).
+
+## Multi-language OCR
+
+Hint the OCR engine for non-English documents.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    processing_options={
+        "ocr_parameters": {"languages": ["en", "fr", "de"]},
+    },
+    expand=["markdown"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  processing_options: {
+    ocr_parameters: { languages: ['en', 'fr', 'de'] },
+  },
+  expand: ['markdown'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	ProcessingOptions: llamacloud.ParsingNewParamsProcessingOptions{
+		OcrParameters: llamacloud.ParsingNewParamsProcessingOptionsOcrParameters{
+			Languages: []llamacloud.ParsingLanguages{
+				llamacloud.ParsingLanguagesEn,
+				llamacloud.ParsingLanguagesFr,
+				llamacloud.ParsingLanguagesDe,
+			},
+		},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .processingOptions(ParsingCreateParams.ProcessingOptions.builder()
+                .ocrParameters(ParsingCreateParams.ProcessingOptions.OcrParameters.builder()
+                        .addLanguage(ParsingLanguages.EN)
+                        .addLanguage(ParsingLanguages.FR)
+                        .addLanguage(ParsingLanguages.DE)
+                        .build())
+                .build())
+        .build());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --processing-options.ocr-parameters '{languages: [en, fr, de]}'
+```
+
+</Tab>
+</Tabs>
+
+## Save money on long mixed-complexity documents
+
+Enable Cost Optimizer to route simple pages to `cost_effective` automatically, then read the per-page metadata to see which pages got the cheaper tier.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic_plus",
+    version="latest",
+    processing_options={
+        "cost_optimizer": {"enable": True},
+    },
+    expand=["markdown", "metadata"],
+)
+
+# See which pages got the cheaper tier
+for page in result.metadata.pages:
+    flag = "cost-optimized" if page.cost_optimized else "premium"
+    print(f"page {page.page_number}: {flag}")
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic_plus',
+  version: 'latest',
+  processing_options: {
+    cost_optimizer: { enable: true },
+  },
+  expand: ['markdown', 'metadata'],
+});
+
+// See which pages got the cheaper tier
+for (const page of result.metadata.pages) {
+  const flag = page.cost_optimized ? 'cost-optimized' : 'premium';
+  console.log(`page ${page.page_number}: ${flag}`);
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgenticPlus,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	ProcessingOptions: llamacloud.ParsingNewParamsProcessingOptions{
+		CostOptimizer: llamacloud.ParsingNewParamsProcessingOptionsCostOptimizer{
+			Enable: llamacloud.Bool(true),
+		},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+getParams := llamacloud.ParsingGetParams{Expand: []string{"markdown", "metadata"}}
+result, err := client.Parsing.Get(ctx, job.ID, getParams)
+if err != nil {
+	log.Fatal(err)
+}
+for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+	time.Sleep(2 * time.Second)
+	result, err = client.Parsing.Get(ctx, job.ID, getParams)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+if result.Job.Status != "COMPLETED" {
+	log.Fatalf("parse ended as %s", result.Job.Status)
+}
+
+// See which pages got the cheaper tier
+for _, page := range result.Metadata.Pages {
+	flag := "premium"
+	if page.CostOptimized {
+		flag = "cost-optimized"
+	}
+	fmt.Printf("page %d: %s\n", page.PageNumber, flag)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC_PLUS)
+        .version(ParsingCreateParams.Version.LATEST)
+        .processingOptions(ParsingCreateParams.ProcessingOptions.builder()
+                .costOptimizer(ParsingCreateParams.ProcessingOptions.CostOptimizer.builder()
+                        .enable(true)
+                        .build())
+                .build())
+        .build());
+
+ParsingGetParams getParams = ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("markdown")
+        .addExpand("metadata")
+        .build();
+
+ParsingGetResponse result = client.parsing().get(getParams);
+while (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+    Thread.sleep(2000);
+    result = client.parsing().get(getParams);
+}
+if (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+    throw new RuntimeException("parse ended as " + result.job().status());
+}
+
+// See which pages got the cheaper tier
+for (ParsingGetResponse.Metadata.Page page : result.metadata().get().pages()) {
+    String flag = page.costOptimized().orElse(false) ? "cost-optimized" : "premium";
+    System.out.printf("page %d: %s%n", page.pageNumber(), flag);
+}
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+JOB_ID=$(llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic_plus \
+  --version latest \
+  --processing-options.cost-optimizer '{enable: true}' | jq -r '.id')
+
+while true; do
+  STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+
+# See which pages got the cheaper tier
+llp parsing get --job-id "$JOB_ID" --expand metadata \
+  | jq -r '.metadata.pages[] | "page \(.page_number): \(if .cost_optimized then "cost-optimized" else "premium" end)"'
+```
+
+</Tab>
+</Tabs>
+
+See [Cost Optimizer](/parse/guides/configuring-parse#cost-optimizer).
+
+## Steer the parser with a custom prompt
+
+Tell the agentic model what to focus on.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    agentic_options={
+        "custom_prompt": "This is a financial 10-K. Preserve currency symbols on every number and keep the original section hierarchy.",
+    },
+    expand=["markdown"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  agentic_options: {
+    custom_prompt:
+      'This is a financial 10-K. Preserve currency symbols on every number and keep the original section hierarchy.',
+  },
+  expand: ['markdown'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	AgenticOptions: llamacloud.ParsingNewParamsAgenticOptions{
+		CustomPrompt: llamacloud.String("This is a financial 10-K. Preserve currency symbols on every number and keep the original section hierarchy."),
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .agenticOptions(ParsingCreateParams.AgenticOptions.builder()
+                .customPrompt("This is a financial 10-K. Preserve currency symbols on every number and keep the original section hierarchy.")
+                .build())
+        .build());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --agentic-options.custom-prompt 'This is a financial 10-K. Preserve currency symbols on every number and keep the original section hierarchy.'
+```
+
+</Tab>
+</Tabs>
+
+See [Custom Prompt](/parse/guides/configuring-parse#custom-prompt) for prompt-engineering tips.
+
+## Extract a table into pandas
+
+Get structured items, walk for tables, load into a dataframe. The table-to-dataframe step is Python + pandas — for how to fetch the `items` tree in TypeScript, Go, Java, or the CLI, see [Retrieving Results → Markdown plus the structured items tree](/parse/guides/retrieving-results#markdown-plus-the-structured-items-tree).
+
+```python
+import io
+import pandas as pd
+
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    expand=["items"],
+)
+
+# Find the first table on page 3 and load it
+page = result.items.pages[2]  # 0-indexed in the items tree
+table = next(item for item in page.items if getattr(item, "type", None) == "table")
+
+df = pd.read_csv(io.StringIO(table.csv))
+print(df.head())
+```
+
+For an end-to-end version with charts, see the [Parse Charts in PDFs and Analyze with Pandas](/parse/examples/parse_charts_pandas) tutorial.
+
+## Get per-page screenshots for a multimodal pipeline
+
+Save full-page screenshots and list their presigned download URLs alongside a markdown blob for the LLM.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    output_options={"images_to_save": ["screenshot"]},
+    expand=["markdown_full", "images_content_metadata"],
+)
+
+# One big markdown blob for the LLM
+markdown_blob = result.markdown_full
+
+# Each page screenshot as a downloadable URL
+for image in result.images_content_metadata.images:
+    print(f"{image.filename}: {image.presigned_url}")
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  output_options: { images_to_save: ['screenshot'] },
+  expand: ['markdown_full', 'images_content_metadata'],
+});
+
+// One big markdown blob for the LLM
+const markdownBlob = result.markdown_full;
+
+// Each page screenshot as a downloadable URL
+for (const image of result.images_content_metadata?.images ?? []) {
+  console.log(`${image.filename}: ${image.presigned_url}`);
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	OutputOptions: llamacloud.ParsingNewParamsOutputOptions{
+		ImagesToSave: []string{"screenshot"},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+getParams := llamacloud.ParsingGetParams{Expand: []string{"markdown_full", "images_content_metadata"}}
+result, err := client.Parsing.Get(ctx, job.ID, getParams)
+if err != nil {
+	log.Fatal(err)
+}
+for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+	time.Sleep(2 * time.Second)
+	result, err = client.Parsing.Get(ctx, job.ID, getParams)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+if result.Job.Status != "COMPLETED" {
+	log.Fatalf("parse ended as %s", result.Job.Status)
+}
+
+// One big markdown blob for the LLM
+markdownBlob := result.MarkdownFull
+_ = markdownBlob
+
+// Each page screenshot as a downloadable URL
+for _, image := range result.ImagesContentMetadata.Images {
+	fmt.Printf("%s: %s\n", image.Filename, image.PresignedURL)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .outputOptions(ParsingCreateParams.OutputOptions.builder()
+                .addImagesToSave(ParsingCreateParams.OutputOptions.ImagesToSave.SCREENSHOT)
+                .build())
+        .build());
+
+ParsingGetParams getParams = ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("markdown_full")
+        .addExpand("images_content_metadata")
+        .build();
+
+ParsingGetResponse result = client.parsing().get(getParams);
+while (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+    Thread.sleep(2000);
+    result = client.parsing().get(getParams);
+}
+if (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+    throw new RuntimeException("parse ended as " + result.job().status());
+}
+
+// One big markdown blob for the LLM
+String markdownBlob = result.markdownFull().orElse("");
+
+// Each page screenshot as a downloadable URL
+for (ParsingGetResponse.ImagesContentMetadata.Image image : result.imagesContentMetadata().get().images()) {
+    System.out.println(image.filename() + ": " + image.presignedUrl().orElse(""));
+}
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+JOB_ID=$(llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest \
+  --output-options.images-to-save '[screenshot]' | jq -r '.id')
+
+while true; do
+  STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+
+# markdown blob + each page screenshot as a downloadable URL
+llp parsing get --job-id "$JOB_ID" \
+  --expand markdown_full \
+  --expand images_content_metadata \
+  | jq -r '.images_content_metadata.images[] | "\(.filename): \(.presigned_url)"'
+```
+
+</Tab>
+</Tabs>
+
+Each `presigned_url` is a plain HTTP GET away from the image bytes. In Python:
+
+```python
+import requests
+
+for image in result.images_content_metadata.images:
+    img_bytes = requests.get(image.presigned_url).content
+    with open(image.filename, "wb") as f:
+        f.write(img_bytes)
+```
+
+## Push results to a webhook instead of polling
+
+For long-running jobs, let Parse call you back when the job finishes.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic_plus",
+    version="latest",
+    webhook_configurations=[
+        {
+            "webhook_url": "https://your-app.com/parse-callback",
+            "webhook_headers": {"X-My-Auth": "secret"},
+        }
+    ],
+    expand=["markdown"],
+)
+print(f"Job started: {result.job.id}")
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic_plus',
+  version: 'latest',
+  webhook_configurations: [
+    {
+      webhook_url: 'https://your-app.com/parse-callback',
+      webhook_headers: { 'X-My-Auth': 'secret' },
+    },
+  ],
+  expand: ['markdown'],
+});
+console.log(`Job started: ${result.job.id}`);
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgenticPlus,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+	WebhookConfigurations: []llamacloud.ParsingNewParamsWebhookConfiguration{
+		{
+			WebhookURL:     llamacloud.String("https://your-app.com/parse-callback"),
+			WebhookHeaders: map[string]any{"X-My-Auth": "secret"},
+		},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+fmt.Printf("Job started: %s\n", job.ID)
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC_PLUS)
+        .version(ParsingCreateParams.Version.LATEST)
+        .addWebhookConfiguration(ParsingCreateParams.WebhookConfiguration.builder()
+                .webhookUrl("https://your-app.com/parse-callback")
+                .webhookHeaders(ParsingCreateParams.WebhookConfiguration.WebhookHeaders.builder()
+                        .putAdditionalProperty("X-My-Auth", JsonValue.from("secret"))
+                        .build())
+                .build())
+        .build());
+System.out.println("Job started: " + job.id());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic_plus \
+  --version latest \
+  --webhook-configuration.webhook-url 'https://your-app.com/parse-callback' \
+  --webhook-configuration.webhook-headers '{X-My-Auth: secret}' \
+  | jq -r '"Job started: \(.id)"'
+```
+
+</Tab>
+</Tabs>
+
+When the job finishes, Parse POSTs an event notification to your URL. See [Webhook Configurations](/parse/guides/configuring-parse#webhook-configurations).
+
+## Retrieve results later (without re-parsing)
+
+Run the job once, fetch additional fields later by `job_id`.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+# Step 1 — parse with a minimal expand
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="latest",
+    expand=["markdown"],
+)
+job_id = result.job.id
+
+# Step 2 — later, in another script, get the items tree for the same job
+items_result = client.parsing.get(job_id=job_id, expand=["items"])
+for page in items_result.items.pages:
+    print(f"page {page.page_number}: {len(page.items)} items")
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+// Step 1 — parse with a minimal expand
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: 'latest',
+  expand: ['markdown'],
+});
+const jobId = result.job.id;
+
+// Step 2 — later, in another script, get the items tree for the same job
+const itemsResult = await client.parsing.get(jobId, { expand: ['items'] });
+for (const page of itemsResult.items.pages) {
+  console.log(`page ${page.page_number}: ${page.items.length} items`);
+}
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:  llamacloud.String(file.ID),
+	Tier:    llamacloud.ParsingNewParamsTierAgentic,
+	Version: llamacloud.ParsingNewParamsVersionLatest,
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+// Step 1 — poll until the job reaches a terminal status
+getParams := llamacloud.ParsingGetParams{Expand: []string{"markdown"}}
+result, err := client.Parsing.Get(ctx, job.ID, getParams)
+if err != nil {
+	log.Fatal(err)
+}
+for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+	time.Sleep(2 * time.Second)
+	result, err = client.Parsing.Get(ctx, job.ID, getParams)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+if result.Job.Status != "COMPLETED" {
+	log.Fatalf("parse ended as %s", result.Job.Status)
+}
+
+// Step 2 — later, get the items tree for the same job
+itemsResult, err := client.Parsing.Get(ctx, job.ID, llamacloud.ParsingGetParams{
+	Expand: []string{"items"},
+})
+if err != nil {
+	log.Fatal(err)
+}
+for _, page := range itemsResult.Items.Pages {
+	fmt.Printf("page %d: %d items\n", page.PageNumber, len(page.Items))
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version(ParsingCreateParams.Version.LATEST)
+        .build());
+
+// Step 1 — poll until the job reaches a terminal status
+ParsingGetParams getParams = ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("markdown")
+        .build();
+
+ParsingGetResponse result = client.parsing().get(getParams);
+while (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+        && !result.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+    Thread.sleep(2000);
+    result = client.parsing().get(getParams);
+}
+if (!result.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+    throw new RuntimeException("parse ended as " + result.job().status());
+}
+
+// Step 2 — later, get the items tree for the same job
+ParsingGetResponse itemsResult = client.parsing().get(ParsingGetParams.builder()
+        .jobId(job.id())
+        .addExpand("items")
+        .build());
+for (ParsingGetResponse.Items.Page page : itemsResult.items().get().pages()) {
+    if (!page.isStructuredResult()) {
+        continue; // skip failed pages
+    }
+    ParsingGetResponse.Items.Page.StructuredResultPage structured = page.asStructuredResult();
+    System.out.printf("page %d: %d items%n", structured.pageNumber(), structured.items().size());
+}
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+# Step 1 — parse and poll until terminal
+JOB_ID=$(llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version latest | jq -r '.id')
+
+while true; do
+  STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+  case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+  sleep 2
+done
+
+# Step 2 — later, get the items tree for the same job
+llp parsing get --job-id "$JOB_ID" --expand items \
+  | jq -r '.items.pages[] | "page \(.page_number): \(.items | length) items"'
+```
+
+</Tab>
+</Tabs>
+
+See [Retrieving Results](/parse/guides/retrieving-results) for every legal `expand` value.
+
+## Retry a failing job on a smaller tier
+
+If a parse job fails on `agentic_plus` (e.g. for an unusual layout), retry on `agentic`, then `cost_effective`.
+
+<Tabs>
+<Tab title="Python">
+
+```python
+def parse_with_fallback(file_id):
+    for tier in ["agentic_plus", "agentic", "cost_effective"]:
+        try:
+            return client.parsing.parse(
+                file_id=file_id,
+                tier=tier,
+                version="latest",
+                expand=["markdown"],
+            )
+        except Exception as e:
+            print(f"tier {tier} failed: {e}")
+    raise RuntimeError("all tiers failed")
+
+result = parse_with_fallback(file.id)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+async function parseWithFallback(fileId: string) {
+  for (const tier of ['agentic_plus', 'agentic', 'cost_effective'] as const) {
+    try {
+      return await client.parsing.parse({
+        file_id: fileId,
+        tier,
+        version: 'latest',
+        expand: ['markdown'],
+      });
+    } catch (e) {
+      console.log(`tier ${tier} failed: ${e}`);
+    }
+  }
+  throw new Error('all tiers failed');
+}
+
+const result = await parseWithFallback(file.id);
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+// In Go a failed job surfaces as a terminal FAILED/CANCELLED status, not an error,
+// so the fallback checks the status after polling each tier.
+func parseWithFallback(ctx context.Context, client llamacloud.Client, fileID string) (*llamacloud.ParsingGetResponse, error) {
+	tiers := []llamacloud.ParsingNewParamsTier{
+		llamacloud.ParsingNewParamsTierAgenticPlus,
+		llamacloud.ParsingNewParamsTierAgentic,
+		llamacloud.ParsingNewParamsTierCostEffective,
+	}
+	for _, tier := range tiers {
+		job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+			FileID:  llamacloud.String(fileID),
+			Tier:    tier,
+			Version: llamacloud.ParsingNewParamsVersionLatest,
+		})
+		if err != nil {
+			fmt.Printf("tier %s failed: %v\n", tier, err)
+			continue
+		}
+
+		getParams := llamacloud.ParsingGetParams{Expand: []string{"markdown"}}
+		result, err := client.Parsing.Get(ctx, job.ID, getParams)
+		if err != nil {
+			fmt.Printf("tier %s failed: %v\n", tier, err)
+			continue
+		}
+		for result.Job.Status != "COMPLETED" && result.Job.Status != "FAILED" && result.Job.Status != "CANCELLED" {
+			time.Sleep(2 * time.Second)
+			result, err = client.Parsing.Get(ctx, job.ID, getParams)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if result.Job.Status == "COMPLETED" {
+			return result, nil
+		}
+		fmt.Printf("tier %s ended as %s\n", tier, result.Job.Status)
+	}
+	return nil, fmt.Errorf("all tiers failed")
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+// In Java a failed job surfaces as a terminal FAILED/CANCELLED status, not an exception,
+// so the fallback checks the status after polling each tier.
+ParsingGetResponse result = null;
+for (ParsingCreateParams.Tier tier : new ParsingCreateParams.Tier[]{
+        ParsingCreateParams.Tier.AGENTIC_PLUS,
+        ParsingCreateParams.Tier.AGENTIC,
+        ParsingCreateParams.Tier.COST_EFFECTIVE}) {
+    ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+            .fileId(file.id())
+            .tier(tier)
+            .version(ParsingCreateParams.Version.LATEST)
+            .build());
+
+    ParsingGetParams getParams = ParsingGetParams.builder()
+            .jobId(job.id())
+            .addExpand("markdown")
+            .build();
+
+    ParsingGetResponse candidate = client.parsing().get(getParams);
+    while (!candidate.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)
+            && !candidate.job().status().equals(ParsingGetResponse.Job.Status.FAILED)
+            && !candidate.job().status().equals(ParsingGetResponse.Job.Status.CANCELLED)) {
+        Thread.sleep(2000);
+        candidate = client.parsing().get(getParams);
+    }
+    if (candidate.job().status().equals(ParsingGetResponse.Job.Status.COMPLETED)) {
+        result = candidate;
+        break;
+    }
+    System.out.printf("tier %s ended as %s%n", tier, candidate.job().status());
+}
+if (result == null) {
+    throw new RuntimeException("all tiers failed");
+}
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+for TIER in agentic_plus agentic cost_effective; do
+  JOB_ID=$(llp parsing create \
+    --file-id "$FILE_ID" \
+    --tier "$TIER" \
+    --version latest | jq -r '.id')
+
+  while true; do
+    STATUS=$(llp parsing get --job-id "$JOB_ID" | jq -r '.job.status')
+    case "$STATUS" in COMPLETED|FAILED|CANCELLED) break ;; esac
+    sleep 2
+  done
+
+  if [ "$STATUS" = "COMPLETED" ]; then
+    echo "parsed on tier $TIER"
+    break
+  fi
+  echo "tier $TIER ended as $STATUS"
+done
+```
+
+</Tab>
+</Tabs>
+
+## Disable cache for a fresh parse
+
+Skip cached results when you need a deterministic re-parse (e.g. after a tier version change).
+
+<Tabs>
+<Tab title="Python">
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="2026-04-06",
+    disable_cache=True,
+    expand=["markdown"],
+)
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+const result = await client.parsing.parse({
+  file_id: file.id,
+  tier: 'agentic',
+  version: '2026-04-06',
+  disable_cache: true,
+  expand: ['markdown'],
+});
+```
+
+</Tab>
+<Tab title="Go">
+
+```go
+job, err := client.Parsing.New(ctx, llamacloud.ParsingNewParams{
+	FileID:       llamacloud.String(file.ID),
+	Tier:         llamacloud.ParsingNewParamsTierAgentic,
+	Version:      llamacloud.ParsingNewParamsVersion("2026-04-06"),
+	DisableCache: llamacloud.Bool(true),
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+</Tab>
+<Tab title="Java">
+
+```java
+ParsingCreateResponse job = client.parsing().create(ParsingCreateParams.builder()
+        .fileId(file.id())
+        .tier(ParsingCreateParams.Tier.AGENTIC)
+        .version("2026-04-06")
+        .disableCache(true)
+        .build());
+```
+
+</Tab>
+<Tab title="CLI">
+
+```bash
+llp parsing create \
+  --file-id "$FILE_ID" \
+  --tier agentic \
+  --version 2026-04-06 \
+  --disable-cache=true
+```
+
+</Tab>
+</Tabs>
+
+See [Cache Control](/parse/guides/configuring-parse#cache-control).
+
+## See also
+
+- [Parse Examples](/parse/examples/overview) — full walk-throughs of these patterns
+- [Configuration Model](/parse/guides/configuring-parse) — where every option lives in the request shape
+- [API reference: Parse File](https://developers.llamaindex.ai/reference/resources/parsing/methods/create) — full field-by-field listing of every option
+- [Retrieving Results](/parse/guides/retrieving-results) — every legal `expand` value
