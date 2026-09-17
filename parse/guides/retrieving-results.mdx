@@ -1177,6 +1177,7 @@ Returns per-page structured JSON for the pages Parse detected as forms: sections
         "page_width": 612.0,
         "page_height": 792.0,
         "success": true,
+        "detected_form_types": ["w2"],
         "forms": [
           {
             "json": [
@@ -1208,6 +1209,8 @@ Returns per-page structured JSON for the pages Parse detected as forms: sections
 ```
 
 Every page of the document has an entry. A page with no detected form has `"forms": []`. A page whose form pass failed is `{ "page_number": N, "success": false, "error": "..." }` and counts toward the job's page error tolerance like any other failed page.
+
+`detected_form_types` carries the classifier's page-level form-type token so you can route or partition enriched-form pages without re-classifying them. It is a single-element array holding one of `w2`, `f1040`, `f1099_int`, `f1099_misc`, `f1099_nec`, `f1099_div`, `k1_1065`, `k1_1120s`, `k1_1041`, `acord_25`, `acord_125`, `acord_127`, `ss4`, `uscis`, or `other` (the catch-all for unknown, low-confidence, or non-tax forms). It is `null` on pages where no form was detected.
 
 #### metadata
 
