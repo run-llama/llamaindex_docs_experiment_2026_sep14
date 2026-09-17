@@ -320,6 +320,7 @@ The remaining steps — reading the structured JSON off the result and walking i
       "page_width": 612,
       "page_height": 792,
       "success": true,
+      "detected_form_types": ["w2"],
       "forms": [
         {
           "json": [
@@ -381,6 +382,23 @@ How `value` reads depends on the field kind:
 `bbox` holds one or more boxes around the field's fillable area, in the same page-point coordinate space as the `items` output. `page_width` and `page_height` on the page entry give the dimensions of the page. Scale to a screenshot's pixel size the same way as in the [granular bounding boxes example](/parse/examples/parse_granular_bboxes#7-render-boxes-on-the-page-screenshot).
 
 **Always check `success` before reading the `forms` result.** A page whose form pass failed comes back as `{ "page_number": N, "success": false, "error": "..." }`, has its markdown and items marked as failed, and counts toward the job's page error tolerance like any other failed page. A page whose form pass and standard Parse pass both fail is not double-counted toward error tolerance.
+
+### Route pages by form type
+
+Each successful page also carries `detected_form_types`, the classifier's page-level form-type token. Use it to route or partition enriched-form pages by type without re-classifying them yourself — for example, to send every W-2 page to one downstream handler and every Schedule K-1 page to another.
+
+The field is a single-element array holding one of `w2`, `f1040`, `f1099_int`, `f1099_misc`, `f1099_nec`, `f1099_div`, `k1_1065`, `k1_1120s`, `k1_1041`, `acord_25`, `acord_125`, `acord_127`, `ss4`, `uscis`, or `other`. `other` is the catch-all for unknown, low-confidence, or non-tax forms. The field is `null` on pages where no form was detected (which are also the pages returned with an empty `forms` list).
+
+```python
+for page in result.forms.pages:
+    if not page.success or not page.detected_form_types:
+        continue
+    form_type = page.detected_form_types[0]
+    if form_type == "w2":
+        handle_w2(page)
+    elif form_type.startswith("k1_"):
+        handle_k1(page)
+```
 
 ## 4. Walk the structured JSON
 
