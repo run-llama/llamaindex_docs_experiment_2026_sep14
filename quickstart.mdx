@@ -722,6 +722,7 @@ file = client.files.create(file="combined.pdf", purpose="split")
 job = client.beta.split.create(
     document_input={"type": "file_id", "value": file.id},
     configuration={
+        "version": "latest",  # or a dated release like "2026-09-18", or "jev-preview"
         "categories": [
             {
                 "name": "invoice",
@@ -762,6 +763,7 @@ const file = await client.files.create({
 const job = await client.beta.split.create({
   document_input: { type: 'file_id', value: file.id },
   configuration: {
+    version: 'latest', // or a dated release like '2026-09-18', or 'jev-preview'
     categories: [
       {
         name: 'invoice',
@@ -824,6 +826,7 @@ func main() {
 	job, err := client.Beta.Split.New(ctx, llamacloud.BetaSplitNewParams{
 		DocumentInput: llamacloud.SplitDocumentInputParam{Type: "file_id", Value: file.ID},
 		Configuration: llamacloud.BetaSplitNewParamsConfiguration{
+			Version: llamacloud.String("latest"), // or a dated release like "2026-09-18", or "jev-preview"
 			Categories: []llamacloud.SplitCategoryParam{
 				{Name: "invoice", Description: llamacloud.String("Commercial document with line items and totals")},
 				{Name: "contract", Description: llamacloud.String("Legal agreement with terms and signatures")},
@@ -881,6 +884,7 @@ public class SplitQuickStart {
         SplitCreateResponse job = client.beta().split().create(SplitCreateParams.builder()
                 .documentInput(SplitDocumentInput.builder().type("file_id").value(file.id()).build())
                 .configuration(SplitCreateParams.Configuration.builder()
+                        .version("latest") // or a dated release like "2026-09-18", or "jev-preview"
                         .addCategory(SplitCategory.builder()
                                 .name("invoice")
                                 .description("Commercial document with line items and totals")
@@ -915,7 +919,7 @@ FILE_ID=$(llp files create --file combined.pdf --purpose split | jq -r '.id')
 # Split into logical sections
 JOB_ID=$(llp beta:split create \
   --document-input "{type: file_id, value: $FILE_ID}" \
-  --configuration '{categories: [{name: invoice, description: "Commercial document with line items and totals"}, {name: contract, description: "Legal agreement with terms and signatures"}]}' \
+  --configuration '{version: latest, categories: [{name: invoice, description: "Commercial document with line items and totals"}, {name: contract, description: "Legal agreement with terms and signatures"}]}' \
   | jq -r '.id')
 
 # Poll until the job reaches a terminal state (Split statuses are lowercase)
@@ -931,6 +935,7 @@ llp beta:split get --split-job-id "$JOB_ID" | jq -c '.result.segments[]'
 
 </CodeGroup>
 
+    **Versions.** `configuration.version` is optional and follows the same taxonomy as Parse and Extract. `latest` (the default) resolves to the current dated release; today that is `2026-09-18`, which runs the standard per-page generative classifier. Pin the dated string in production so upgrades are opt-in. Preview names (currently `jev-preview`) are selectable by name only and are never picked up by `latest` — `jev-preview` uses a batched classification backend aimed at lower latency and cost, and stays on that backend until you switch off it.
 
     [Full Guide](https://developers.llamaindex.ai/llamaparse/split/getting_started) | [Examples](https://developers.llamaindex.ai/llamaparse/split/examples)
   </Tab>
