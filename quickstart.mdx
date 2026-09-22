@@ -722,7 +722,7 @@ file = client.files.create(file="combined.pdf", purpose="split")
 job = client.beta.split.create(
     document_input={"type": "file_id", "value": file.id},
     configuration={
-        "version": "latest",  # or a dated release like "2026-09-18", or "jev-preview"
+        "version": "latest",  # or a dated release like "2026-09-18", or a preview like "jev-preview" or "turbo-preview"
         "categories": [
             {
                 "name": "invoice",
@@ -763,7 +763,7 @@ const file = await client.files.create({
 const job = await client.beta.split.create({
   document_input: { type: 'file_id', value: file.id },
   configuration: {
-    version: 'latest', // or a dated release like '2026-09-18', or 'jev-preview'
+    version: 'latest', // or a dated release like "2026-09-18", or a preview like "jev-preview" or "turbo-preview"
     categories: [
       {
         name: 'invoice',
@@ -826,7 +826,7 @@ func main() {
 	job, err := client.Beta.Split.New(ctx, llamacloud.BetaSplitNewParams{
 		DocumentInput: llamacloud.SplitDocumentInputParam{Type: "file_id", Value: file.ID},
 		Configuration: llamacloud.BetaSplitNewParamsConfiguration{
-			Version: llamacloud.String("latest"), // or a dated release like "2026-09-18", or "jev-preview"
+			Version: llamacloud.String("latest"), // or a dated release like "2026-09-18", or a preview like "jev-preview" or "turbo-preview"
 			Categories: []llamacloud.SplitCategoryParam{
 				{Name: "invoice", Description: llamacloud.String("Commercial document with line items and totals")},
 				{Name: "contract", Description: llamacloud.String("Legal agreement with terms and signatures")},
@@ -884,7 +884,7 @@ public class SplitQuickStart {
         SplitCreateResponse job = client.beta().split().create(SplitCreateParams.builder()
                 .documentInput(SplitDocumentInput.builder().type("file_id").value(file.id()).build())
                 .configuration(SplitCreateParams.Configuration.builder()
-                        .version("latest") // or a dated release like "2026-09-18", or "jev-preview"
+                        .version("latest") // or a dated release like "2026-09-18", or a preview like "jev-preview" or "turbo-preview"
                         .addCategory(SplitCategory.builder()
                                 .name("invoice")
                                 .description("Commercial document with line items and totals")
@@ -935,7 +935,10 @@ llp beta:split get --split-job-id "$JOB_ID" | jq -c '.result.segments[]'
 
 </CodeGroup>
 
-    **Versions.** `configuration.version` is optional and follows the same taxonomy as Parse and Extract. `latest` (the default) resolves to the current dated release; today that is `2026-09-18`, which runs the standard per-page generative classifier. Pin the dated string in production so upgrades are opt-in. Preview names (currently `jev-preview`) are selectable by name only and are never picked up by `latest` — `jev-preview` uses a batched classification backend aimed at lower latency and cost, and stays on that backend until you switch off it.
+    **Versions.** `configuration.version` is optional and follows the same taxonomy as Parse and Extract. `latest` (the default) resolves to the current dated release; today that is `2026-09-18`, which runs the standard per-page generative classifier over parsed text. Pin the dated string in production so upgrades are opt-in. Preview names are selectable by name only and are never picked up by `latest`; a job stays on the preview version you named until you switch off it. Two previews are available:
+
+    - `jev-preview` — batched classification backend that answers the classifier's fixed questions in one request per page batch instead of one generative call per page. Aimed at lower latency and cost while still reading parsed text.
+    - `turbo-preview` — classifies straight from rendered page images and runs no parse step, so it skips the parse stage entirely. Useful when you want faster splits and don't need parsed text alongside the classification.
 
     [Full Guide](https://developers.llamaindex.ai/llamaparse/split/getting_started) | [Examples](https://developers.llamaindex.ai/llamaparse/split/examples)
   </Tab>
