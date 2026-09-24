@@ -42,6 +42,36 @@ Use `"version": "latest"` during development to always get the most recent stabl
 
 When a newer version ships, you decide when (and whether) to bump. We don't break existing pinned versions — they stay available for the foreseeable future, so you can upgrade on your own schedule and roll back if a new version doesn't suit your workload.
 
+### Semver version selectors
+
+You can also set `version` to a semver selector instead of a date. Parse assigns each dated release a semver number within its tier. Numbering is independent per tier, so `1.0.3` on `agentic` and `1.0.3` on `cost_effective` point to different dates.
+
+- Existing dated releases are numbered `1.0.0`, `1.0.1`, `1.0.2`, and so on, in date order.
+- Future release lines start a new minor version, such as `1.1.0`, and increment the patch within that line.
+
+A selector can be full or a prefix:
+
+| Selector | Resolves to |
+|----------|-------------|
+| `"1.0.2"` | Exactly one dated release for the tier |
+| `"1.0"` | The newest dated release in the `1.0` line for the tier |
+| `"1"` | The newest dated release in the `1` line for the tier |
+
+Use a full selector or a date when you need a fixed version. Use a prefix to follow a release line and pick up new patches without moving to a new line:
+
+```json
+{
+  "tier": "agentic",
+  "version": "1.0"
+}
+```
+
+Parse resolves the selector when you submit the job and stores the resolved date on the job. A running or completed job keeps that date when a new patch ships. Saved configurations keep the selector itself, so each new job resolves it again. Auto-mode overrides resolve against their own `tier`.
+
+To see which date a selector resolved to, read `metadata.version` on the parse result or the `version` in the job parameters. To list the dated releases available for each tier, call [`GET /api/v2/parse/versions`](/api-reference/parse/list-parse-versions).
+
+A selector that matches no release for the tier fails as a configuration error. Parse never falls back to another release line or to the default version. Previews and experimental versions have no semver alias. Select them by their exact name.
+
 `tier` and `version` are both **required** on every parse request. Forgetting either will return a validation error.
 
 ## Available tiers

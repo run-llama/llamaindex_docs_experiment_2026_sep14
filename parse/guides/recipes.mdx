@@ -318,7 +318,20 @@ llp parsing create \
 </Tab>
 </Tabs>
 
-See [Tiers → Versioning and reproducibility](/parse/guides/tiers#versioning-and-reproducibility) for the latest available dates.
+To follow a release line instead of a single date, pass a semver prefix such as `"1.0"`. Parse resolves it to the newest dated release in that line for the tier when you submit the job:
+
+```python
+result = client.parsing.parse(
+    file_id=file.id,
+    tier="agentic",
+    version="1.0",  # newest dated release in the 1.0 line for agentic
+    expand=["markdown"],
+)
+```
+
+A full selector such as `"1.0.2"` pins exactly one dated release, like a date does. The job stores the resolved date, so it doesn't change when a new patch ships. Check `metadata.version` on the result to see which date Parse used. Call [`GET /api/v2/parse/versions`](/api-reference/parse/list-parse-versions) to list the available dates per tier. A selector that matches no release fails as a configuration error instead of falling back to another version.
+
+See [Tiers → Versioning and reproducibility](/parse/guides/tiers#versioning-and-reproducibility) for the latest available dates and how semver selectors resolve.
 
 ## Parse only specific pages
 
