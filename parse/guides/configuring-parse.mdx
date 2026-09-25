@@ -441,6 +441,19 @@ Steer the parser with natural-language instructions — focus on specific conten
 { "processing_options": { "ocr_parameters": { "languages": ["en", "fr", "de"] } } }
 ```
 
+Leave `languages` unset to let Parse detect the script on each document. Parse runs OCR with a detected script that has an OCR model. If every page shows a script with no OCR model, Parse skips OCR on images and keeps the native text.
+
+Parse normalizes the codes you set against the OCR models it has:
+
+| You request | Parse does |
+|---|---|
+| `kn` or `tjk` | Remaps to `ka` (Kannada) or `tg` (Tajik) |
+| A non-Latin language with no OCR model, such as Bengali, Assamese, Meitei, Georgian, Odia, or Sinhala | Drops the code. If every code is one of these, Parse skips OCR on images and keeps native text. |
+| An unknown string, or a language with no model that is mostly written in Latin script (such as Javanese) | Drops the code. If nothing is left, Parse runs English OCR. |
+| Codes that need different recognition models, such as `fr,ja` | Keeps one model family. The first non-Latin code wins, `en` is always kept, and codes for other models are dropped. |
+
+For example, `fr,ja` becomes `ja`, and `fr,ja,en` becomes `ja,en`. A list of only Latin-script languages, such as `en,fr,de`, is unchanged. Don't mix Latin and non-Latin codes other than `en` in one list. Parse drops the Latin codes instead of reading them.
+
 ### Table extraction tuning
 
 | Flag | What it does |

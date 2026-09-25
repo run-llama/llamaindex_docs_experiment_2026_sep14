@@ -481,6 +481,8 @@ Values are page-height/width ratios (0.0–1.0).
 
 Hint the OCR engine for non-English documents.
 
+Leave `languages` unset to let Parse detect the script automatically. When you set it, keep each list to one model family: Latin-script languages (`en`, `fr`, `de`), or one non-Latin language plus `en` (`ja`, `en`). In a mixed list such as `fr,ja`, Parse keeps only the first non-Latin code and `en`. Parse also remaps `kn` to `ka` and `tjk` to `tg`, drops languages it has no OCR model for, and falls back to English OCR when nothing is left. See [OCR languages](/parse/guides/configuring-parse#ocr-languages).
+
 <Tabs>
 <Tab title="Python">
 
